@@ -1,26 +1,40 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-primary: #00193c;
+  --color-primary-container: #002d62;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #7796d1;
+  --color-secondary: #545f72;
+  --color-secondary-container: #d5e0f7;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #586377;
+  --color-background: #f9f9ff;
+  --color-on-background: #161c27;
+  --color-surface: #f9f9ff;
+  --color-on-surface: #161c27;
+  --color-on-surface-variant: #43474f;
+  --color-surface-container: #e8eeff;
+  --color-surface-container-low: #f1f3ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #e3e8f9;
+  --color-surface-container-highest: #dde2f3;
+  --color-outline: #747781;
+  --color-outline-variant: #c4c6d1;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+  --color-inverse-surface: #2a303d;
+  --color-inverse-on-surface: #ecf0ff;
+  --color-inverse-primary: #abc7ff;
+  
+  --font-sans: 'Public Sans', sans-serif;
+  --font-public-sans: 'Public Sans', sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-public-sans);
 }
