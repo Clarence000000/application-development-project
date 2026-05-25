@@ -250,7 +250,7 @@ export default function LoginPage() {
 
               {/* Secondary Action */}
               <div className="text-center space-y-4">
-                <p className="text-xs text-on-surface-variant">Don't have an account?</p>
+                <p className="text-xs text-on-surface-variant">Don&apos;t have an account?</p>
                 <Link
                   className="block w-full border border-outline text-primary font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-center text-sm"
                   href="/register"
