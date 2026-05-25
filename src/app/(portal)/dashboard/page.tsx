@@ -36,7 +36,7 @@ export default function DashboardPage() {
           {/* Borang Pengesahan Bermastautin */}
           <div
             className="bg-white p-5 rounded-lg border border-[#E2E8F0] hover:border-primary-container transition-all cursor-pointer group flex flex-col"
-            onClick={() => handleCardClick("/new-application")}
+            onClick={() => handleCardClick("/residential_verification")}
           >
             <div className="w-10 h-10 bg-surface-container-low rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary-container transition-colors">
               <span className="material-symbols-outlined text-primary group-hover:text-white">
@@ -58,7 +58,7 @@ export default function DashboardPage() {
           {/* Borang Pengesahan Pendapatan */}
           <div
             className="bg-white p-5 rounded-lg border border-[#E2E8F0] hover:border-primary-container transition-all cursor-pointer group flex flex-col"
-            onClick={() => handleCardClick("/new-application")}
+            onClick={() => handleCardClick("/income_verification")}
           >
             <div className="w-10 h-10 bg-surface-container-low rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary-container transition-colors">
               <span className="material-symbols-outlined text-primary group-hover:text-white">
@@ -80,7 +80,7 @@ export default function DashboardPage() {
           {/* Rayuan Bayaran Denda IC */}
           <div
             className="bg-white p-5 rounded-lg border border-[#E2E8F0] hover:border-primary-container transition-all cursor-pointer group flex flex-col"
-            onClick={() => handleCardClick("/new-application")}
+            onClick={() => handleCardClick("/ic_penalty_appeal")}
           >
             <div className="w-10 h-10 bg-surface-container-low rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary-container transition-colors">
               <span className="material-symbols-outlined text-primary group-hover:text-white">
