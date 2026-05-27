@@ -46,3 +46,4 @@ design-pages/**
 .next/
 out/
 dist/
+.env.local

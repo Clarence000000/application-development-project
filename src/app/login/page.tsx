@@ -146,7 +146,21 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="text-center space-y-4 mt-6">
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-outline-variant"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-2 bg-white text-outline font-semibold uppercase tracking-widest text-[10px]">
+                    Or
+                  </span>
+                </div>
+              </div>
+
+              {/* Secondary Action */}
+              <div className="text-center space-y-4">
+                <p className="text-xs text-on-surface-variant">Don&apos;t have an account?</p>
                 <Link
                   className="block w-full border border-outline text-primary font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-center text-sm"
                   href="/register"
