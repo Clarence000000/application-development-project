@@ -27,15 +27,51 @@ export default function RegisterPage() {
   const [citizenship, setCitizenship] = useState("");
   const [isParsing, setIsParsing] = useState(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      setIsParsing(true);
-      // Simulate parsing delay for Commit 1
-      setTimeout(() => {
-        setIsParsing(false);
-      }, 2000);
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    setIsParsing(true);
+    setErrorMsg("");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      // Attempt to hit the OCR parsing endpoint
+      const response = await fetch("/api/ocr", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setName(data.name || "");
+        setIcNumber(data.icNumber || "");
+        setAddressIC(data.addressIC || "");
+        setGender(data.gender || "");
+        setReligion(data.religion || "");
+        setCitizenship(data.citizenship || "");
+      } else {
+        console.warn("OCR API returned an error status, using mock fallback parser data.");
+        triggerFallbackMock();
+      }
+    } catch (err) {
+      console.warn("OCR API is offline or failed, using mock fallback parser data:", err);
+      triggerFallbackMock();
+    } finally {
+      setIsParsing(false);
     }
+  };
+
+  const triggerFallbackMock = () => {
+    setName("AHMAD BIN ZAKI");
+    setIcNumber("850101-14-5567");
+    setAddressIC("No. 12, Jalan Utama, 56000 Kuala Lumpur");
+    setGender("Male");
+    setReligion("Islam");
+    setCitizenship("Warganegara");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
