@@ -18,6 +18,26 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // MyKad parsed states (Sprint 2 - Commit 1)
+  const [name, setName] = useState("");
+  const [icNumber, setIcNumber] = useState("");
+  const [addressIC, setAddressIC] = useState("");
+  const [gender, setGender] = useState("");
+  const [religion, setReligion] = useState("");
+  const [citizenship, setCitizenship] = useState("");
+  const [isParsing, setIsParsing] = useState(false);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setIsParsing(true);
+      // Simulate parsing delay for Commit 1
+      setTimeout(() => {
+        setIsParsing(false);
+      }, 2000);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -191,19 +211,49 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* MyKad Upload UI (Visual only for now) */}
+                {/* MyKad Upload UI (Sprint 2 - Commit 1) */}
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-on-surface">MyKad Verification (Sprint 2)</label>
-                  <div className="grid gap-3 grid-cols-2">
-                    <div className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${isLoading ? 'opacity-50' : 'hover:border-primary cursor-pointer group'}`}>
-                      <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">upload_file</span>
-                      <p className="text-[11px] font-medium text-on-surface">Upload Image</p>
+                  <label className="block text-xs font-semibold text-on-surface">MyKad Verification</label>
+                  <input
+                    id="mykad-file-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                    disabled={isLoading || isParsing}
+                  />
+                  {isParsing ? (
+                    <div className="border-2 border-dashed border-primary bg-primary/5 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-pulse">
+                      <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-[11px] font-bold text-primary">Reading MyKad Data...</p>
+                      <p className="text-[9px] text-on-surface-variant mt-0.5">Please wait, extracting details</p>
                     </div>
-                    <div className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${isLoading ? 'opacity-50' : 'hover:border-primary cursor-pointer group'}`}>
-                      <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">photo_camera</span>
-                      <p className="text-[11px] font-medium text-on-surface">Take Photo</p>
+                  ) : (
+                    <div className="grid gap-3 grid-cols-2">
+                      <div
+                        onClick={() => !isLoading && document.getElementById("mykad-file-input")?.click()}
+                        className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${
+                          isLoading ? "opacity-50" : "hover:border-primary cursor-pointer group"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">
+                          upload_file
+                        </span>
+                        <p className="text-[11px] font-medium text-on-surface">Upload Image</p>
+                      </div>
+                      <div
+                        onClick={() => !isLoading && document.getElementById("mykad-file-input")?.click()}
+                        className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${
+                          isLoading ? "opacity-50" : "hover:border-primary cursor-pointer group"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">
+                          photo_camera
+                        </span>
+                        <p className="text-[11px] font-medium text-on-surface">Take Photo</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="pt-3 border-t border-outline-variant">
