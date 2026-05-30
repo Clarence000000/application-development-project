@@ -90,16 +90,22 @@ export default function RegisterPage() {
       return;
     }
 
+    // Sprint 2 verification checkbox validation
+    if (name && !isVerified) {
+      setErrorMsg("Please confirm that your MyKad details are verified.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const payload: RegistrationPayload = {
-        name: "Pending OCR Extract", 
-        icNumber: "Pending OCR Extract",
-        addressIC: "Pending OCR Extract",
-        gender: "Pending",
-        religion: "Pending",
-        citizenship: "Pending",
+        name: name || "Not Scanned", 
+        icNumber: icNumber || "Not Scanned",
+        addressIC: addressIC || "Not Scanned",
+        gender: gender || "Pending",
+        religion: religion || "Pending",
+        citizenship: citizenship || "Pending",
         
         addressCurrent: "", 
         maritalStatus: "",
@@ -412,9 +418,11 @@ export default function RegisterPage() {
                 <div className="pt-3 border-t border-outline-variant">
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || isParsing || (name ? !isVerified : false)}
                     className={`w-full py-3 font-bold rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${
-                      isLoading ? "bg-gray-400 text-white cursor-not-allowed" : "bg-primary text-on-primary shadow-lg shadow-primary/20 hover:bg-primary-container active:scale-[0.98] cursor-pointer"
+                      isLoading || isParsing || (name ? !isVerified : false)
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-primary text-on-primary shadow-lg shadow-primary/20 hover:bg-primary-container active:scale-[0.98] cursor-pointer"
                     }`}
                   >
                     <span>{isLoading ? "Creating Account..." : "Create Account"}</span>
