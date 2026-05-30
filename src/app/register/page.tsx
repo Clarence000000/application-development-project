@@ -26,6 +26,7 @@ export default function RegisterPage() {
   const [religion, setReligion] = useState("");
   const [citizenship, setCitizenship] = useState("");
   const [isParsing, setIsParsing] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -291,6 +292,122 @@ export default function RegisterPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Collapsible Verification Panel (Sprint 2 - Commit 3) */}
+                {name && !isParsing && (
+                  <div className="bg-surface-container-low border border-outline-variant rounded-xl p-4 space-y-4 animate-fade-in">
+                    <div className="flex items-center gap-2 border-b border-outline-variant pb-2">
+                      <span className="material-symbols-outlined text-primary text-lg">verified</span>
+                      <h3 className="text-xs font-bold text-primary uppercase tracking-wide">
+                        Verify &amp; Edit Profile Details
+                      </h3>
+                    </div>
+
+                    <p className="text-[10px] text-on-surface-variant leading-relaxed">
+                      Please verify that the information extracted from your MyKad is correct. Edit any fields if necessary.
+                    </p>
+
+                    <div className="space-y-3">
+                      {/* Name input */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-semibold text-on-surface">Full Name</label>
+                        <input
+                          className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          disabled={isLoading}
+                        />
+                      </div>
+
+                      {/* IC and Gender Grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-on-surface">IC Number</label>
+                          <input
+                            className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
+                            type="text"
+                            placeholder="e.g. 850101-14-5567"
+                            value={icNumber}
+                            onChange={(e) => setIcNumber(e.target.value)}
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-on-surface">Gender</label>
+                          <select
+                            className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs cursor-pointer"
+                            value={gender}
+                            onChange={(e) => setGender(e.target.value)}
+                            required
+                            disabled={isLoading}
+                          >
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Religion and Citizenship Grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-on-surface">Religion</label>
+                          <input
+                            className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
+                            type="text"
+                            placeholder="e.g. Islam"
+                            value={religion}
+                            onChange={(e) => setReligion(e.target.value)}
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-on-surface">Citizenship</label>
+                          <input
+                            className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
+                            type="text"
+                            placeholder="e.g. Warganegara"
+                            value={citizenship}
+                            onChange={(e) => setCitizenship(e.target.value)}
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Address input */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-semibold text-on-surface">Permanent Address (IC)</label>
+                        <textarea
+                          className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs resize-none"
+                          rows={2}
+                          value={addressIC}
+                          onChange={(e) => setAddressIC(e.target.value)}
+                          required
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Verification Toggle */}
+                    <label className="flex items-start gap-2 pt-2 border-t border-outline-variant cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 rounded border-outline text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                        checked={isVerified}
+                        onChange={(e) => setIsVerified(e.target.checked)}
+                        disabled={isLoading}
+                      />
+                      <span className="text-[10px] font-medium text-on-surface-variant group-hover:text-on-surface transition-colors select-none">
+                        I confirm that my MyKad details above are correct and authentic.
+                      </span>
+                    </label>
+                  </div>
+                )}
 
                 <div className="pt-3 border-t border-outline-variant">
                   <button
