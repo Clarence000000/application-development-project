@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { parseMyKadOcrText } from "@/lib/mykadOcr";
 
 export const runtime = "nodejs";
 
@@ -64,7 +63,7 @@ export async function POST(request: Request) {
   if (!visionResponse.ok) {
     return NextResponse.json(
       {
-        error: "Unable to scan the MyKad image at the moment. Please try again or fill manually.",
+        error: "Unable to scan the MyKad image at the moment. Please try again or enter the details manually.",
       },
       { status: 502 }
     );
@@ -82,5 +81,8 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json(parseMyKadOcrText(rawText));
+  return NextResponse.json({
+    rawText,
+    detected: true,
+  });
 }

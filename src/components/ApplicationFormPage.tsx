@@ -3,9 +3,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import MyKadScanPanel from "@/components/MyKadScanPanel";
 import type { ApplicationFormConfig } from "@/lib/applicationForms";
-import type { MyKadOcrResult } from "@/lib/mykadOcr";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -90,42 +88,6 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
     setShowSuccess(true);
   }
 
-  function handleMyKadAutofill(result: MyKadOcrResult) {
-    setValues((current) => {
-      const nextValues = { ...current };
-
-      if ("name" in nextValues && result.name) {
-        nextValues.name = result.name;
-      }
-
-      if ("idNumber" in nextValues && result.icNumber) {
-        nextValues.idNumber = result.icNumber;
-      }
-
-      if ("citizenship" in nextValues && result.citizenship) {
-        nextValues.citizenship = result.citizenship;
-      }
-
-      if ("icAddress" in nextValues && result.address) {
-        nextValues.icAddress = result.address;
-      }
-
-      if ("residentialAddress" in nextValues && result.address && !nextValues.residentialAddress) {
-        nextValues.residentialAddress = result.address;
-      }
-
-      return nextValues;
-    });
-
-    setErrors((current) => {
-      const nextErrors = { ...current };
-      for (const fieldName of ["name", "idNumber", "citizenship", "icAddress", "residentialAddress"]) {
-        delete nextErrors[fieldName];
-      }
-      return nextErrors;
-    });
-  }
-
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <section className="border-b border-outline-variant pb-5">
@@ -170,8 +132,6 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
         <ProcessStep title="Langkah 2" description="Pejabat Penghulu membuat semakan." />
         <ProcessStep title="Langkah 3" description="Pemohon menerima arahan seterusnya." />
       </section>
-
-      <MyKadScanPanel onAutofill={handleMyKadAutofill} />
 
       {Object.keys(errors).length > 0 && (
         <div className="border-l-4 border-error bg-error-container px-4 py-3 text-on-error-container">
