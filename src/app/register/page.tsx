@@ -41,7 +41,7 @@ export default function RegisterPage() {
       formData.append("image", file);
 
       // Attempt to hit the OCR parsing endpoint
-      const response = await fetch("/api/ocr", {
+      const response = await fetch("/api/ocr/mykad", {
         method: "POST",
         body: formData,
       });
