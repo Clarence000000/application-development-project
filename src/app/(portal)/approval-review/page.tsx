@@ -1,0 +1,648 @@
+"use client";
+
+import React, { useMemo, useState } from "react";
+
+type ApprovalStatus =
+  | "Pending Review"
+  | "Staff Vetted"
+  | "Approved"
+  | "Rejected";
+
+type ApplicationRecord = {
+  id: string;
+  applicantName: string;
+  idNumber: string;
+  formName: string;
+  submittedDate: string;
+  mukim: string;
+  status: ApprovalStatus;
+  purpose: string;
+  address: string;
+  phoneNumber: string;
+  supportingNotes: string;
+  timeline: { title: string; date: string; done: boolean }[];
+};
+
+const initialApplications: ApplicationRecord[] = [
+  {
+    id: "PGH-2026-0184",
+    applicantName: "Ahmad Bin Zaki",
+    idNumber: "010203-01-1234",
+    formName: "Borang Pengesahan Bermastautin",
+    submittedDate: "02 Jun 2026",
+    mukim: "Mukim Ayer Hitam",
+    status: "Pending Review",
+    purpose: "Application for school assistance documentation.",
+    address: "No. 14, Jalan Mawar 3, Kampung Seri Aman, 86100 Ayer Hitam, Johor",
+    phoneNumber: "012-345 6789",
+    supportingNotes: "Applicant declared current residence as matching the service area.",
+    timeline: [
+      { title: "Application Submitted", date: "02 Jun 2026", done: true },
+      { title: "Staff Vetting", date: "Pending", done: false },
+      { title: "Penghulu Decision", date: "Pending", done: false },
+    ],
+  },
+  {
+    id: "PGH-2026-0179",
+    applicantName: "Nur Aisyah Binti Rahman",
+    idNumber: "990812-10-4456",
+    formName: "Borang Pengesahan Pendapatan",
+    submittedDate: "01 Jun 2026",
+    mukim: "Mukim Parit Raja",
+    status: "Staff Vetted",
+    purpose: "Income confirmation for welfare support application.",
+    address: "Lot 22, Kampung Parit Lapis, 86400 Parit Raja, Johor",
+    phoneNumber: "013-889 2110",
+    supportingNotes: "Self-employed applicant. Staff verified submitted income declaration.",
+    timeline: [
+      { title: "Application Submitted", date: "01 Jun 2026", done: true },
+      { title: "Staff Vetting", date: "03 Jun 2026", done: true },
+      { title: "Penghulu Decision", date: "Pending", done: false },
+    ],
+  },
+  {
+    id: "PGH-2026-0171",
+    applicantName: "Lim Wei Shen",
+    idNumber: "950604-01-2233",
+    formName: "Borang Pengurangan / Rayuan Bayaran Denda Kad Pengenalan",
+    submittedDate: "29 May 2026",
+    mukim: "Mukim Sri Gading",
+    status: "Approved",
+    purpose: "Appeal for reduction of damaged MyKad replacement fine.",
+    address: "32, Jalan Seroja, Taman Sri Gading, 83300 Batu Pahat, Johor",
+    phoneNumber: "016-502 8841",
+    supportingNotes: "Approved after Penghulu review. Formal letter can be issued after Sprint 3 flow.",
+    timeline: [
+      { title: "Application Submitted", date: "29 May 2026", done: true },
+      { title: "Staff Vetting", date: "30 May 2026", done: true },
+      { title: "Penghulu Decision", date: "31 May 2026", done: true },
+    ],
+  },
+  {
+    id: "PGH-2026-0166",
+    applicantName: "Siti Hajar Binti Musa",
+    idNumber: "020114-01-9988",
+    formName: "Borang Pengesahan Bermastautin",
+    submittedDate: "27 May 2026",
+    mukim: "Mukim Ayer Hitam",
+    status: "Rejected",
+    purpose: "Residence confirmation for banking record update.",
+    address: "No. 6, Jalan Cempaka, Taman Desa Jaya, 86100 Ayer Hitam, Johor",
+    phoneNumber: "011-1092 7762",
+    supportingNotes: "Rejected because declared residence was outside the selected mukim.",
+    timeline: [
+      { title: "Application Submitted", date: "27 May 2026", done: true },
+      { title: "Staff Vetting", date: "28 May 2026", done: true },
+      { title: "Penghulu Decision", date: "29 May 2026", done: true },
+    ],
+  },
+];
+
+const currentStaff = {
+  name: "Staff Mukim Ayer Hitam",
+  assignedMukim: "Mukim Ayer Hitam",
+};
+
+const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: string }> = {
+  "Pending Review": {
+    badge: "bg-secondary-container text-on-secondary-container",
+    dot: "bg-on-secondary-container",
+    icon: "pending_actions",
+  },
+  "Staff Vetted": {
+    badge: "bg-blue-100 text-blue-800",
+    dot: "bg-blue-600",
+    icon: "fact_check",
+  },
+  Approved: {
+    badge: "bg-green-100 text-green-800",
+    dot: "bg-green-600",
+    icon: "verified",
+  },
+  Rejected: {
+    badge: "bg-error-container text-on-error-container",
+    dot: "bg-error",
+    icon: "cancel",
+  },
+};
+
+export default function ApprovalReviewPage() {
+  const [applications, setApplications] = useState(initialApplications);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"All" | ApprovalStatus>("All");
+  const [search, setSearch] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+
+  const selectedApplication = applications.find((application) => application.id === selectedId);
+
+  const assignedApplications = useMemo(
+    () =>
+      applications.filter(
+        (application) => application.mukim === currentStaff.assignedMukim,
+      ),
+    [applications],
+  );
+
+  const filteredApplications = useMemo(() => {
+    return assignedApplications.filter((application) => {
+      const query = search.trim().toLowerCase();
+      const matchesSearch =
+        !query ||
+        application.id.toLowerCase().includes(query) ||
+        application.applicantName.toLowerCase().includes(query) ||
+        application.formName.toLowerCase().includes(query);
+      const matchesStatus = statusFilter === "All" || application.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [assignedApplications, search, statusFilter]);
+
+  const counts = useMemo(
+    () => ({
+      pending: assignedApplications.filter((application) => application.status === "Pending Review").length,
+      vetted: assignedApplications.filter((application) => application.status === "Staff Vetted").length,
+      approved: assignedApplications.filter((application) => application.status === "Approved").length,
+      rejected: assignedApplications.filter((application) => application.status === "Rejected").length,
+    }),
+    [assignedApplications],
+  );
+
+  const updateStatus = (nextStatus: ApprovalStatus) => {
+    if (!selectedApplication) return;
+
+    setApplications((current) =>
+      current.map((application) =>
+        application.id === selectedApplication.id
+          ? {
+              ...application,
+              status: nextStatus,
+              supportingNotes: remarks.trim() || application.supportingNotes,
+              timeline: application.timeline.map((step) => {
+                if (
+                  nextStatus === "Staff Vetted" && step.title === "Staff Vetting"
+                ) {
+                  return { ...step, date: "Today", done: true };
+                }
+
+                if (
+                  (nextStatus === "Approved" || nextStatus === "Rejected") &&
+                  (step.title === "Staff Vetting" || step.title === "Penghulu Decision")
+                ) {
+                  return { ...step, date: step.done ? step.date : "Today", done: true };
+                }
+
+                return step;
+              }),
+            }
+          : application,
+      ),
+    );
+    setToastMessage(`${selectedApplication.id} updated to ${nextStatus}.`);
+    setRemarks("");
+    window.setTimeout(() => setToastMessage(""), 2800);
+  };
+
+  const requestMissingDocument = () => {
+    if (!selectedApplication) return;
+
+    const note =
+      remarks.trim() ||
+      "Missing document request recorded. Applicant will be notified to upload the required document.";
+
+    setApplications((current) =>
+      current.map((application) =>
+        application.id === selectedApplication.id
+          ? {
+              ...application,
+              supportingNotes: note,
+            }
+          : application,
+      ),
+    );
+    setToastMessage(`${selectedApplication.id} missing document request recorded.`);
+    setRemarks("");
+    window.setTimeout(() => setToastMessage(""), 2800);
+  };
+
+  return (
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+            Staff / Penghulu Workspace
+          </p>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-primary">
+            Approval Review
+          </h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-secondary">
+            Review applications assigned to your administrative area only.
+          </p>
+          <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
+            <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
+            Assigned area: {currentStaff.assignedMukim}
+          </div>
+        </div>
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:w-auto">
+          <StatusSummary label="Pending" value={counts.pending} tone="bg-secondary-container text-on-secondary-container" />
+          <StatusSummary label="Vetted" value={counts.vetted} tone="bg-blue-100 text-blue-800" />
+          <StatusSummary label="Approved" value={counts.approved} tone="bg-green-100 text-green-800" />
+          <StatusSummary label="Rejected" value={counts.rejected} tone="bg-error-container text-on-error-container" />
+        </div>
+      </header>
+
+      <section className="rounded-lg border border-outline-variant bg-white p-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+          <div className="md:col-span-7">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
+              Search
+            </label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">
+                search
+              </span>
+              <input
+                className="w-full rounded-lg border border-outline bg-surface-container-low py-2 pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                placeholder="Search by application ID, applicant, or borang name"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
+              Status
+            </label>
+            <select
+              className="w-full rounded-lg border border-outline bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as "All" | ApprovalStatus)}
+            >
+              <option>All</option>
+              <option>Pending Review</option>
+              <option>Staff Vetted</option>
+              <option>Approved</option>
+              <option>Rejected</option>
+            </select>
+          </div>
+          <button
+            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-2"
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("All");
+            }}
+          >
+            <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-lg border border-outline-variant bg-white">
+        <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
+          <div>
+            <h2 className="text-sm font-bold text-primary">Application Queue</h2>
+            <p className="text-[11px] font-medium text-on-surface-variant">
+              {filteredApplications.length} assigned record(s) shown
+            </p>
+          </div>
+          <span className="material-symbols-outlined text-outline">view_list</span>
+        </div>
+
+        <div className="hidden xl:block">
+          <table className="w-full border-collapse text-left">
+            <thead className="bg-surface-container-low text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+              <tr>
+                <th className="px-4 py-3">Application</th>
+                <th className="px-4 py-3">Applicant</th>
+                <th className="px-4 py-3">Borang</th>
+                <th className="px-4 py-3">Mukim</th>
+                <th className="px-4 py-3">Submitted</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredApplications.map((application) => {
+                const style = statusStyles[application.status];
+
+                return (
+                  <tr
+                    key={application.id}
+                    className="border-t border-outline-variant transition hover:bg-surface-container-low"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
+                          <span className="material-symbols-outlined text-[19px]">{style.icon}</span>
+                        </div>
+                        <span className="text-xs font-bold text-primary">{application.id}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-on-surface">
+                      {application.applicantName}
+                      <p className="mt-0.5 text-[11px] font-medium text-on-surface-variant">
+                        {application.idNumber}
+                      </p>
+                    </td>
+                    <td className="max-w-[260px] px-4 py-3 text-xs font-medium text-on-surface-variant">
+                      {application.formName}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-on-surface">
+                      {application.mukim}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-medium text-on-surface-variant">
+                      {application.submittedDate}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={application.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
+                        onClick={() => setSelectedId(application.id)}
+                      >
+                        View
+                        <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="divide-y divide-outline-variant xl:hidden">
+          {filteredApplications.map((application) => {
+            const style = statusStyles[application.status];
+
+            return (
+              <button
+                key={application.id}
+                className="w-full px-4 py-3 text-left transition hover:bg-surface-container-low"
+                onClick={() => setSelectedId(application.id)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
+                    <span className="material-symbols-outlined text-[19px]">{style.icon}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-outline">
+                        {application.id}
+                      </span>
+                      <StatusBadge status={application.status} />
+                    </div>
+                    <h2 className="mt-1 truncate text-sm font-bold text-on-surface">
+                      {application.applicantName}
+                    </h2>
+                    <p className="mt-0.5 line-clamp-2 text-xs font-medium text-on-surface-variant">
+                      {application.formName}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-on-surface-variant">
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                        {application.submittedDate}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">location_on</span>
+                        {application.mukim}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredApplications.length === 0 && (
+          <div className="p-8 text-center">
+            <span className="material-symbols-outlined text-3xl text-outline">search_off</span>
+            <p className="mt-2 text-sm font-bold text-on-surface">No matching applications</p>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Adjust the search keyword or status filter.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {selectedApplication && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-sm">
+          <button
+            className="absolute inset-0 cursor-default"
+            aria-label="Close application detail"
+            onClick={() => {
+              setSelectedId(null);
+              setRemarks("");
+            }}
+          />
+          <section className="relative flex h-full w-full max-w-5xl flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-outline">
+                  {selectedApplication.id}
+                </span>
+                <h2 className="mt-1 text-lg font-bold leading-tight text-primary">
+                  {selectedApplication.formName}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {selectedApplication.applicantName}
+                </p>
+              </div>
+              <button
+                className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container"
+                onClick={() => {
+                  setSelectedId(null);
+                  setRemarks("");
+                }}
+              >
+                close
+              </button>
+            </div>
+
+            <div className="border-b border-outline-variant px-4 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                    Application Detail
+                  </p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    Review supporting information and record the latest decision.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={selectedApplication.status} />
+                  <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-bold text-on-surface-variant">
+                    {selectedApplication.mukim}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="space-y-5">
+                <section>
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+                    Applicant Details
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <DetailItem label="IC Number" value={selectedApplication.idNumber} />
+                    <DetailItem label="Phone Number" value={selectedApplication.phoneNumber} />
+                    <DetailItem label="Mukim" value={selectedApplication.mukim} />
+                    <DetailItem label="Submitted Date" value={selectedApplication.submittedDate} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <DetailItem label="Address" value={selectedApplication.address} />
+                    <DetailItem label="Purpose" value={selectedApplication.purpose} />
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr]">
+                  <div>
+                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+                      Review Notes
+                    </h3>
+                    <div className="min-h-24 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface">
+                      {selectedApplication.supportingNotes}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+                      New Remark
+                    </h3>
+                    <textarea
+                      className="min-h-32 w-full rounded-lg border border-outline bg-white p-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                      placeholder="Record staff or Penghulu remarks before updating the decision"
+                      value={remarks}
+                      onChange={(event) => setRemarks(event.target.value)}
+                    />
+                  </div>
+                </section>
+              </div>
+
+              <aside className="space-y-4">
+                <section>
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+                    Approval Record
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedApplication.timeline.map((step) => (
+                      <div
+                        key={step.title}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className={`material-symbols-outlined text-[17px] ${
+                              step.done ? "text-primary" : "text-outline"
+                            }`}
+                          >
+                            {step.done ? "check_circle" : "radio_button_unchecked"}
+                          </span>
+                          <p
+                            className={`truncate text-xs font-bold ${
+                              step.done ? "text-primary" : "text-on-surface-variant"
+                            }`}
+                          >
+                            {step.title}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-[11px] font-medium text-on-surface-variant">
+                          {step.date}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-primary">
+                    Decision Actions
+                  </h3>
+                  <div className="mt-3 space-y-2">
+                    <button
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container"
+                      onClick={() => updateStatus("Staff Vetted")}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">fact_check</span>
+                      Mark as Staff Vetted
+                    </button>
+                    <button
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800 transition hover:bg-yellow-100"
+                      onClick={requestMissingDocument}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                      Request Missing Document
+                    </button>
+                    <button
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                      onClick={() => updateStatus("Approved")}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">verified</span>
+                      Approve
+                    </button>
+                    <button
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-error px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                      onClick={() => updateStatus("Rejected")}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                      Reject
+                    </button>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {toastMessage && (
+        <div className="fixed bottom-20 right-6 z-50 flex items-center gap-2 rounded-lg bg-inverse-surface px-4 py-3 text-xs font-semibold text-inverse-on-surface shadow-lg">
+          <span className="material-symbols-outlined text-sm text-green-400">check_circle</span>
+          {toastMessage}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusSummary({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className={`min-w-24 rounded-lg px-3 py-2 text-center ${tone}`}>
+      <p className="text-lg font-bold leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{label}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: ApprovalStatus }) {
+  const style = statusStyles[status];
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+      {status}
+    </span>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-lg border border-outline-variant bg-surface-container-low p-3 ${className}`}>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-on-surface">{value}</p>
+    </div>
+  );
+}

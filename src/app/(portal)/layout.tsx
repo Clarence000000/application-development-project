@@ -38,6 +38,11 @@ export default function PortalLayout({
       href: "/review-status",
       icon: "fact_check",
     },
+    {
+      name: "Approval Review",
+      href: "/approval-review",
+      icon: "how_to_reg",
+    },
   ];
 
   return (
@@ -350,7 +355,12 @@ export default function PortalLayout({
               >
                 {item.icon}
               </span>
-              <span className="text-[10px]">{item.name.replace("Application", "Apply").replace("Review Status", "Status")}</span>
+              <span className="text-[10px]">
+                {item.name
+                  .replace("Application", "Apply")
+                  .replace("Review Status", "Status")
+                  .replace("Approval Review", "Approval")}
+              </span>
             </Link>
           );
         })}
