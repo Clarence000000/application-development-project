@@ -69,16 +69,6 @@ export async function createApplicationDocument({
   };
 }
 
-export function generateSerialNumber(date = new Date()) {
-  const year = date.getFullYear();
-  const randomCode = Array.from(crypto.getRandomValues(new Uint8Array(3)))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase();
-
-  return `PPP-${year}-${randomCode}`;
-}
-
 export function generateReferenceNumber(date = new Date()) {
   const year = date.getFullYear();
   const randomCode = Array.from(crypto.getRandomValues(new Uint8Array(3)))

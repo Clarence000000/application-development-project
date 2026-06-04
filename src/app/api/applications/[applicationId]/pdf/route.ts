@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { generateSerialNumber } from "@/lib/applications";
+import { generateSecureApplicationSerial } from "@/lib/serialGenerator";
 import {
   generateApplicationCertificatePdf,
   type CertificateApplicant,
@@ -29,7 +35,8 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const pdfBytes = await generateApplicationCertificatePdf(certificateData);
-  const filename = `${certificateData.formType}-certificate-${applicationId}.pdf`;
+  const documentRef = certificateData.referenceNumber || applicationId;
+  const filename = `${certificateData.formType}-certificate-${documentRef}.pdf`;
 
   return new NextResponse(Buffer.from(pdfBytes), {
     status: 200,
@@ -81,10 +88,12 @@ async function findApprovedCertificateDataFromFirestore(
         application.updatedAt ||
         new Date().toISOString(),
     );
+    const applicantIcNumber = read(values.idNumber, user.icNumber);
+
     const serialNumber = await getOrCreateSerialNumber(
       applicationId,
       application.serialNumber,
-      approvedAt,
+      applicantIcNumber,
     );
 
     return {
@@ -119,16 +128,42 @@ async function findApprovedCertificateDataFromFirestore(
 async function getOrCreateSerialNumber(
   applicationId: string,
   currentSerialNumber: unknown,
-  approvedAt: string,
+  icNumber: string,
 ) {
   const existingSerialNumber = read(currentSerialNumber);
   if (existingSerialNumber) {
     return existingSerialNumber;
   }
 
-  const serialNumber = generateSerialNumber(new Date(approvedAt));
-  await updateDoc(doc(db, "applications", applicationId), { serialNumber });
-  return serialNumber;
+  return runTransaction(db, async (transaction) => {
+    const counterRef = doc(db, "counters", "documentSerial");
+    const applicationRef = doc(db, "applications", applicationId);
+    const counterSnapshot = await transaction.get(counterRef);
+    const lastIncrementalId = counterSnapshot.exists()
+      ? Number(counterSnapshot.data().lastNumber || 0)
+      : 0;
+    const nextIncrementalId = lastIncrementalId + 1;
+    const serialNumber = generateSecureApplicationSerial(
+      lastIncrementalId,
+      icNumber,
+      { prefix: "PHGL-MKM" },
+    );
+
+    transaction.set(
+      counterRef,
+      {
+        lastNumber: nextIncrementalId,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    transaction.update(applicationRef, {
+      serialNumber,
+      serialCounter: nextIncrementalId,
+    });
+
+    return serialNumber;
+  });
 }
 
 function mapApplicant(
@@ -162,11 +197,8 @@ function mapApplicant(
 
 function normalizeFormType(value: unknown): CertificateFormType | null {
   const normalized = String(value || "").toLowerCase();
-  if (
-    normalized.includes("residential") ||
-    normalized.includes("bermastautin")
-  ) {
-    return "residential";
+  if (normalized.includes("bermastautin")) {
+    return "mastautin";
   }
   if (normalized.includes("income") || normalized.includes("pendapatan")) {
     return "income";
@@ -176,7 +208,7 @@ function normalizeFormType(value: unknown): CertificateFormType | null {
     normalized.includes("rayuan") ||
     normalized.includes("denda")
   ) {
-    return "ic-appeal";
+    return "rayuan";
   }
   return null;
 }

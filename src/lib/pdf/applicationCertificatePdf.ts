@@ -8,7 +8,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 
-export type CertificateFormType = "residential" | "income" | "ic-appeal";
+export type CertificateFormType = "mastautin" | "income" | "rayuan";
 
 export type CertificateApplicant = {
   name: string;
@@ -67,12 +67,18 @@ export async function generateApplicationCertificatePdf(
 ) {
   const templateBytes = await readFile(getTemplatePath(data.formType));
   const pdfDoc = await PDFDocument.load(templateBytes);
+  const documentRef = data.referenceNumber || data.applicationId;
+
+  pdfDoc.setTitle(`${data.formType}-certificate-${documentRef}`);
+  pdfDoc.setSubject("Penghulu application certificate");
+  pdfDoc.setCreator("Sistem Pelbagai Perakuan Penghulu");
+  pdfDoc.setProducer("Sistem Pelbagai Perakuan Penghulu");
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const firstPage = pdfDoc.getPage(0);
   const secondPage = pdfDoc.getPage(1);
 
-  if (data.formType === "residential") {
+  if (data.formType === "mastautin") {
     fillResidentialPdf(firstPage, secondPage, data, regularFont, boldFont);
   } else if (data.formType === "income") {
     fillIncomePdf(firstPage, secondPage, data, regularFont, boldFont);
@@ -173,14 +179,14 @@ function fillResidentialPdf(
     `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
-      x: 440,
+      x: 420,
       y: 805,
       size: 8,
       maxWidth: 165,
     },
   );
   drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
-    x: 440,
+    x: 420,
     y: 793,
     size: 8,
     maxWidth: 165,
@@ -200,6 +206,23 @@ function fillResidentialPdf(
     x: 426,
     y: 672,
     maxWidth: 75,
+  });
+  drawValue(
+    secondPage,
+    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    regularFont,
+    {
+      x: 420,
+      y: 805,
+      size: 8,
+      maxWidth: 165,
+    },
+  );
+  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+    x: 420,
+    y: 793,
+    size: 8,
+    maxWidth: 165,
   });
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
@@ -261,14 +284,14 @@ function fillIncomePdf(
     `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
-      x: 373,
+      x: 420,
       y: 805,
       size: 8,
       maxWidth: 165,
     },
   );
   drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
-    x: 373,
+    x: 420,
     y: 793,
     size: 8,
     maxWidth: 165,
@@ -288,6 +311,23 @@ function fillIncomePdf(
     x: 426,
     y: 672,
     maxWidth: 75,
+  });
+  drawValue(
+    secondPage,
+    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    regularFont,
+    {
+      x: 420,
+      y: 805,
+      size: 8,
+      maxWidth: 165,
+    },
+  );
+  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+    x: 420,
+    y: 793,
+    size: 8,
+    maxWidth: 165,
   });
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
@@ -362,14 +402,14 @@ function fillIcAppealPdf(
     `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
-      x: 383,
+      x: 420,
       y: 805,
       size: 8,
       maxWidth: 165,
     },
   );
   drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
-    x: 383,
+    x: 420,
     y: 793,
     size: 8,
     maxWidth: 195,
@@ -389,6 +429,23 @@ function fillIcAppealPdf(
     x: 426,
     y: 672,
     maxWidth: 75,
+  });
+  drawValue(
+    secondPage,
+    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    regularFont,
+    {
+      x: 420,
+      y: 805,
+      size: 8,
+      maxWidth: 165,
+    },
+  );
+  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+    x: 420,
+    y: 793,
+    size: 8,
+    maxWidth: 165,
   });
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
@@ -479,7 +536,7 @@ function drawCheck(
 
 function getTemplatePath(formType: CertificateFormType) {
   const filename =
-    formType === "residential"
+    formType === "mastautin"
       ? "borang-bermastautin-template.pdf"
       : formType === "income"
         ? "borang-pendapatan-template.pdf"
