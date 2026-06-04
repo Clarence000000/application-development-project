@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, query, where, type Timestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 interface Application {
   id: string;
@@ -10,12 +13,14 @@ interface Application {
   title: string;
   date: string;
   meta: string;
-  status: "In Review" | "Approved" | "Action Required" | "Draft";
+  status: "Pending" | "In Review" | "Approved" | "Action Required" | "Rejected" | "Draft";
   statusColor: string;
   statusBg: string;
   statusDot: string;
   warning?: string;
   link?: string;
+  downloadUrl?: string;
+  serialNumber?: string;
   timeline: { title: string; date: string; desc: string; done: boolean }[];
 }
 
@@ -48,11 +53,33 @@ const mockApplications: Application[] = [
     statusColor: "text-green-800",
     statusBg: "bg-green-100",
     statusDot: "bg-green-600",
+    downloadUrl: "/api/applications/GC-2023-7721/pdf",
+    serialNumber: "PPP-2023-X8F9A2",
     timeline: [
       { title: "Application Drafted", date: "Oct 10, 2023", desc: "Citizen initiated the form", done: true },
       { title: "Application Submitted", date: "Oct 12, 2023", desc: "Transferred to Penghulu Office", done: true },
       { title: "Under Review", date: "Oct 13, 2023", desc: "Penghulu verified bank statement", done: true },
       { title: "Approved & Issued", date: "Oct 15, 2023", desc: "Digital certificate generated", done: true },
+    ],
+  },
+  {
+    id: "GC-2023-8843",
+    type: "Borang Pengesahan Bermastautin",
+    category: "Residential",
+    title: "Borang Pengesahan Bermastautin",
+    date: "Oct 12, 2023",
+    meta: "Pejabat Penghulu Mukim A",
+    status: "Approved",
+    statusColor: "text-green-800",
+    statusBg: "bg-green-100",
+    statusDot: "bg-green-600",
+    downloadUrl: "/api/applications/GC-2023-8843/pdf",
+    serialNumber: "PPP-2023-B7C4D1",
+    timeline: [
+      { title: "Application Drafted", date: "Oct 10, 2023", desc: "Citizen initiated the form", done: true },
+      { title: "Application Submitted", date: "Oct 11, 2023", desc: "Transferred to Penghulu Office", done: true },
+      { title: "Under Review", date: "Oct 11, 2023", desc: "Residential details verified by office staff", done: true },
+      { title: "Approved & Issued", date: "Oct 12, 2023", desc: "Digital certificate generated", done: true },
     ],
   },
   {
@@ -96,6 +123,40 @@ export default function ReviewStatusPage() {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [applications, setApplications] = useState<Application[]>(mockApplications);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setApplications(mockApplications);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, "applications"), where("uid", "==", user.uid))
+        );
+        const firestoreApplications = snapshot.docs.map((documentSnapshot) =>
+          mapFirestoreApplication(documentSnapshot.id, documentSnapshot.data())
+        ).sort((left, right) => right.sortTime - left.sortTime);
+
+        setApplications(
+          firestoreApplications.length > 0
+            ? firestoreApplications.map(({ sortTime: _sortTime, ...application }) => application)
+            : mockApplications
+        );
+      } catch (error) {
+        console.error("Failed to load applications", error);
+        setApplications(mockApplications);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -106,7 +167,7 @@ export default function ReviewStatusPage() {
   };
 
   // Filter application list
-  const filteredApps = mockApplications.filter((app) => {
+  const filteredApps = applications.filter((app) => {
     const matchesSearch =
       app.id.toLowerCase().includes(search.toLowerCase()) ||
       app.title.toLowerCase().includes(search.toLowerCase());
@@ -116,9 +177,11 @@ export default function ReviewStatusPage() {
   });
 
   // Calculate statistics dynamically
-  const approvedCount = mockApplications.filter((a) => a.status === "Approved").length;
-  const inReviewCount = mockApplications.filter((a) => a.status === "In Review").length;
-  const actionRequiredCount = mockApplications.filter((a) => a.status === "Action Required").length;
+  const approvedCount = applications.filter((a) => a.status === "Approved").length;
+  const inReviewCount = applications.filter(
+    (a) => a.status === "In Review" || a.status === "Pending"
+  ).length;
+  const actionRequiredCount = applications.filter((a) => a.status === "Action Required").length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -161,8 +224,10 @@ export default function ReviewStatusPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option>All Statuses</option>
+              <option>Pending</option>
               <option>In Review</option>
               <option>Approved</option>
+              <option>Rejected</option>
               <option>Draft</option>
               <option>Action Required</option>
             </select>
@@ -184,7 +249,11 @@ export default function ReviewStatusPage() {
 
       {/* Applications List */}
       <div className="space-y-3">
-        {filteredApps.length > 0 ? (
+        {isLoading ? (
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center">
+            <p className="text-sm font-bold text-primary">Loading applications...</p>
+          </div>
+        ) : filteredApps.length > 0 ? (
           filteredApps.map((app) => (
             <div
               key={app.id}
@@ -239,6 +308,12 @@ export default function ReviewStatusPage() {
                         {app.warning}
                       </span>
                     )}
+                    {app.serialNumber && (
+                      <span className="flex items-center gap-1 text-green-700 font-bold">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                        {app.serialNumber}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -263,13 +338,25 @@ export default function ReviewStatusPage() {
                     <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                   </Link>
                 ) : (
-                  <button
-                    onClick={() => setSelectedApp(app)}
-                    className="bg-surface-container-highest text-primary font-semibold text-xs px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all flex items-center gap-1 cursor-pointer"
-                  >
-                    View Details
-                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                  </button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {app.status === "Approved" && app.downloadUrl && (
+                      <a
+                        href={app.downloadUrl}
+                        download
+                        className="bg-green-700 text-white font-semibold text-xs px-4 py-2 rounded-lg hover:bg-green-800 transition-all flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">download</span>
+                        PDF
+                      </a>
+                    )}
+                    <button
+                      onClick={() => setSelectedApp(app)}
+                      className="bg-surface-container-highest text-primary font-semibold text-xs px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      View Details
+                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -374,6 +461,18 @@ export default function ReviewStatusPage() {
                     </p>
                   </div>
                 )}
+
+                {selectedApp.serialNumber && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-start gap-2 text-xs">
+                    <span className="material-symbols-outlined text-green-700 text-sm shrink-0">
+                      verified_user
+                    </span>
+                    <div>
+                      <p className="text-green-900 font-bold">AI-Validated Serial Number</p>
+                      <p className="text-green-800 font-semibold">{selectedApp.serialNumber}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Application Details Summary */}
@@ -433,6 +532,16 @@ export default function ReviewStatusPage() {
 
             {/* Drawer Footer Actions */}
             <div className="p-4 border-t border-outline-variant bg-surface-container-lowest flex gap-3">
+              {selectedApp.status === "Approved" && selectedApp.downloadUrl && (
+                <a
+                  href={selectedApp.downloadUrl}
+                  download
+                  className="flex-1 bg-green-700 text-white font-bold text-xs py-2.5 rounded-lg hover:bg-green-800 active:scale-95 transition-all flex items-center justify-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">download</span>
+                  Download PDF
+                </a>
+              )}
               {selectedApp.status === "Action Required" && (
                 <button
                   onClick={() => {
@@ -465,4 +574,125 @@ export default function ReviewStatusPage() {
       )}
     </div>
   );
+}
+
+function mapFirestoreApplication(id: string, data: Record<string, unknown>): Application & { sortTime: number } {
+  const status = mapStatus(data.status);
+  const submittedAt = formatFirestoreDate(data.submittedAt);
+  const approvedAt = formatFirestoreDate(data.approvedAt);
+  const submittedDate = toDate(data.submittedAt);
+  const serialNumber = readString(data.serialNumber);
+  const title = readString(data.formType) || "Permohonan Penghulu";
+
+  return {
+    id: readString(data.referenceNumber) || readString(data.applicationId) || id,
+    type: title,
+    category: readString(data.formSlug),
+    title,
+    date: submittedAt,
+    meta: "Pejabat Penghulu",
+    status,
+    ...statusStyle(status),
+    serialNumber: serialNumber || undefined,
+    downloadUrl: status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
+    warning: status === "Rejected" ? readString(data.rejectionReason) || "Application rejected" : undefined,
+    timeline: buildTimeline(status, submittedAt, approvedAt),
+    sortTime: submittedDate?.getTime() || 0,
+  };
+}
+
+function buildTimeline(status: Application["status"], submittedAt: string, approvedAt: string) {
+  return [
+    {
+      title: "Application Submitted",
+      date: submittedAt,
+      desc: "Application record created in Firestore.",
+      done: true,
+    },
+    {
+      title: "Under Review",
+      date: status === "Pending" ? "Pending" : submittedAt,
+      desc: "Awaiting clerk and Penghulu validation.",
+      done: status !== "Pending",
+    },
+    {
+      title: status === "Rejected" ? "Rejected" : "Approved & Issued",
+      date: status === "Approved" ? approvedAt : status === "Rejected" ? "Completed" : "Pending",
+      desc:
+        status === "Approved"
+          ? "Digital certificate and serial number are ready."
+          : status === "Rejected"
+          ? "Application did not pass review."
+          : "Final approval and PDF issuance pending.",
+      done: status === "Approved" || status === "Rejected",
+    },
+  ];
+}
+
+function mapStatus(value: unknown): Application["status"] {
+  const status = readString(value).toLowerCase();
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (status === "in review") return "In Review";
+  if (status === "action required") return "Action Required";
+  return "Pending";
+}
+
+function statusStyle(status: Application["status"]) {
+  if (status === "Approved") {
+    return {
+      statusColor: "text-green-800",
+      statusBg: "bg-green-100",
+      statusDot: "bg-green-600",
+    };
+  }
+
+  if (status === "Action Required" || status === "Rejected") {
+    return {
+      statusColor: "text-on-error-container",
+      statusBg: "bg-error-container",
+      statusDot: "bg-error",
+    };
+  }
+
+  if (status === "Draft") {
+    return {
+      statusColor: "text-on-surface-variant",
+      statusBg: "bg-surface-container-high",
+      statusDot: "bg-outline",
+    };
+  }
+
+  return {
+    statusColor: "text-on-secondary-container",
+    statusBg: "bg-secondary-container",
+    statusDot: "bg-on-secondary-container",
+  };
+}
+
+function formatFirestoreDate(value: unknown) {
+  const date = toDate(value);
+  if (!date) {
+    return "Pending";
+  }
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function toDate(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value) {
+    return (value as Timestamp).toDate();
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
