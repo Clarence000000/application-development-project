@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ApplicationFormConfig } from "@/lib/applicationForms";
+import { auth, db } from "@/lib/firebase";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -66,7 +67,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
     return nextErrors;
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateForm();
     setErrors(nextErrors);
@@ -75,17 +76,38 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       return;
     }
 
-    window.localStorage.setItem(
-      "latestApplication",
-      JSON.stringify({
-        id: `APP-${Date.now()}`,
-        type: config.slug,
-        status: "Pending",
-        values,
-        submittedAt: new Date().toISOString(),
-      })
-    );
-    setShowSuccess(true);
+    const appId = `APP-${Date.now()}`;
+    const submittedAt = new Date().toISOString();
+    const timeline = [
+      { title: "Permohonan Draf", date: new Date().toLocaleDateString("ms-MY"), desc: "Pemohon mula mengisi borang", done: true },
+      { title: "Permohonan Dihantar", date: new Date().toLocaleDateString("ms-MY"), desc: "Permohonan berjaya dihantar ke Pejabat Penghulu", done: true },
+      { title: "Dalam Semakan", date: "Pending", desc: "Menunggu pengesahan daripada Penghulu", done: false },
+      { title: "Kelulusan Akhir", date: "Pending", desc: "Pengeluaran sijil rasmi", done: false }
+    ];
+
+    const appData = {
+      id: appId,
+      userId: auth.currentUser?.uid || "anonymous",
+      type: config.slug,
+      title: config.title,
+      status: "Pending",
+      values,
+      submittedAt,
+      meta: "Pejabat Penghulu Mukim Ayer Hitam",
+      timeline
+    };
+
+    try {
+      const { collection, addDoc } = await import("firebase/firestore");
+      await addDoc(collection(db, "applications"), appData);
+      window.localStorage.setItem("latestApplication", JSON.stringify(appData));
+      setShowSuccess(true);
+    } catch (err) {
+      console.error("Failed to save application to Firestore: ", err);
+      // Fallback
+      window.localStorage.setItem("latestApplication", JSON.stringify(appData));
+      setShowSuccess(true);
+    }
   }
 
   return (
