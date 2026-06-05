@@ -23,6 +23,12 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     router.push("/login");
   };
 
+  const isAuthPage = pathname === "/staff/login" || pathname === "/staff/register";
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="fixed left-0 top-0 z-50 flex h-14 w-full items-center justify-between border-b border-[#E2E8F0] bg-white px-6">
