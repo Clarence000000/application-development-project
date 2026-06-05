@@ -1,11 +1,72 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+
+interface Application {
+  id: string;
+  type: string;
+  title: string;
+  submittedAt: string;
+  status: string;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [userName, setUserName] = useState("");
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // 1. Fetch user's profile details
+          const userRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            if (data?.name) {
+              setUserName(data.name);
+            }
+          }
+
+          // 2. Fetch user's applications
+          const q = query(
+            collection(db, "applications"),
+            where("userId", "==", user.uid)
+          );
+          const querySnap = await getDocs(q);
+          const appsList: Application[] = [];
+          querySnap.forEach((doc) => {
+            const data = doc.data();
+            appsList.push({
+              id: data.id,
+              type: data.type,
+              title: data.title,
+              submittedAt: data.submittedAt,
+              status: data.status,
+            });
+          });
+          // Sort client-side descending by submittedAt
+          appsList.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+          setApplications(appsList.slice(0, 3));
+        } catch (err) {
+          console.error("Error loading dashboard data: ", err);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleCardClick = (href: string) => {
     router.push(href);
@@ -14,7 +75,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-primary mb-0.5">Welcome, Ahmad</h1>
+        <h1 className="text-2xl font-bold text-primary mb-0.5">
+          {isLoading ? "Sila tunggu..." : `Selamat Datang, ${userName || "Pemohon"}`}
+        </h1>
         <p className="text-sm text-secondary">
           Quick access to your certificate applications and latest status.
         </p>
@@ -115,82 +178,90 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-3">
-            {/* Status Row 1 */}
-            <div
-              className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
-              onClick={() => handleCardClick("/review-status")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-blue-600 text-xl">payments</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">Pengesahan Pendapatan</p>
-                  <p className="text-[11px] text-on-surface-variant">Submitted on 28 Oct 2023</p>
-                </div>
+            {isLoading ? (
+              <div className="text-center py-6 text-sm text-secondary font-medium">
+                Sila tunggu, memuatkan status permohonan...
               </div>
-              <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase tracking-wider">
-                  In Review
-                </span>
-                <span className="material-symbols-outlined text-outline text-lg">chevron_right</span>
-              </div>
-            </div>
+            ) : applications.length > 0 ? (
+              applications.map((app) => {
+                const isApproved = app.status === "Approved";
+                const isDraft = app.status === "Draft";
+                const isActionRequired = app.status === "Action Required";
 
-            {/* Status Row 2 */}
-            <div
-              className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
-              onClick={() => handleCardClick("/review-status")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-green-600 text-xl">home_pin</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">Pengesahan Bermastautin</p>
-                  <p className="text-[11px] text-on-surface-variant">Completed on 12 Oct 2023</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-bold uppercase tracking-wider">
-                  Approved
-                </span>
-                <span className="material-symbols-outlined text-outline text-lg">chevron_right</span>
-              </div>
-            </div>
+                // Icon and colors mapping
+                let iconName = "description";
+                let iconColor = "text-blue-600";
+                let iconBg = "bg-blue-50";
+                if (app.type === "residential") {
+                  iconName = "home_pin";
+                  iconColor = "text-green-600";
+                  iconBg = "bg-green-50";
+                } else if (app.type === "income") {
+                  iconName = "payments";
+                  iconColor = "text-blue-600";
+                  iconBg = "bg-blue-50";
+                } else if (app.type === "ic_penalty") {
+                  iconName = "receipt_long";
+                  iconColor = "text-yellow-600";
+                  iconBg = "bg-yellow-50";
+                }
 
-            {/* Status Row 3 */}
-            <div
-              className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
-              onClick={() => handleCardClick("/review-status")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-yellow-50 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-yellow-600 text-xl">
-                    receipt_long
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">Rayuan Denda IC</p>
-                  <p className="text-[11px] text-on-surface-variant">Draft saved on 30 Oct 2023</p>
-                </div>
+                let statusText = "In Review";
+                let statusClass = "bg-secondary-container text-on-secondary-container";
+                if (isApproved) {
+                  statusText = "Approved";
+                  statusClass = "bg-green-100 text-green-800";
+                } else if (isDraft) {
+                  statusText = "Draft";
+                  statusClass = "bg-surface-container-highest text-on-surface-variant";
+                } else if (isActionRequired) {
+                  statusText = "Action Required";
+                  statusClass = "bg-error-container text-on-error-container";
+                }
+
+                const dateObj = new Date(app.submittedAt);
+                const formattedDate = isNaN(dateObj.getTime())
+                  ? app.submittedAt
+                  : dateObj.toLocaleDateString("ms-MY", { day: "numeric", month: "short", year: "numeric" });
+
+                return (
+                  <div
+                    key={app.id}
+                    className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
+                    onClick={() => handleCardClick("/review-status")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full ${iconBg} flex items-center justify-center`}>
+                        <span className={`material-symbols-outlined ${iconColor} text-xl`}>{iconName}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-on-surface">{app.title}</p>
+                        <p className="text-[11px] text-on-surface-variant">Dihantar pada {formattedDate}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded-full ${statusClass} text-[10px] font-bold uppercase tracking-wider`}>
+                        {statusText}
+                      </span>
+                      <span className="material-symbols-outlined text-outline text-lg">chevron_right</span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="bg-white border border-outline-variant border-dashed rounded-lg p-6 text-center text-xs text-on-surface-variant">
+                Tiada permohonan aktif ditemui. Sila klik "Apply for a Certificate" untuk membuat permohonan baru.
               </div>
-              <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
-                  Draft
-                </span>
-                <span className="material-symbols-outlined text-outline text-lg">chevron_right</span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Empty State Placeholder */}
-          <div className="p-8 rounded-lg border-2 border-dashed border-outline-variant flex flex-col items-center justify-center text-center bg-surface-container-lowest">
-            <div className="mb-2 text-outline">
+          {/* Guidelines Sidebar */}
+          <div className="p-8 rounded-lg border border-outline-variant flex flex-col items-center justify-center text-center bg-surface-container-lowest">
+            <div className="mb-2 text-primary">
               <span className="material-symbols-outlined text-3xl">history_edu</span>
             </div>
-            <p className="text-xs text-on-surface-variant max-w-[180px]">
-              History of older applications will appear here.
+            <p className="text-xs text-on-surface-variant max-w-[200px]">
+              Sejarah permohonan anda dipaparkan mengikut kemas kini terbaru secara langsung dari sistem.
             </p>
           </div>
         </div>
