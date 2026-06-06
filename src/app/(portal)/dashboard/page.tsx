@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, type Timestamp } from "firebase/firestore";
 
 interface Application {
   id: string;
@@ -42,14 +42,14 @@ export default function DashboardPage() {
           );
           const querySnap = await getDocs(q);
           const appsList: Application[] = [];
-          querySnap.forEach((doc) => {
-            const data = doc.data();
+          querySnap.forEach((documentSnapshot) => {
+            const data = documentSnapshot.data();
             appsList.push({
-              id: data.id,
-              type: data.type,
-              title: data.title,
-              submittedAt: data.submittedAt,
-              status: data.status,
+              id: data.referenceNumber || data.applicationId || data.id || documentSnapshot.id,
+              type: data.formSlug || data.type,
+              title: data.formType || data.title || "Permohonan Penghulu",
+              submittedAt: formatFirestoreDate(data.submittedAt),
+              status: data.status || "Pending",
             });
           });
           // Sort client-side descending by submittedAt
@@ -219,10 +219,7 @@ export default function DashboardPage() {
                   statusClass = "bg-error-container text-on-error-container";
                 }
 
-                const dateObj = new Date(app.submittedAt);
-                const formattedDate = isNaN(dateObj.getTime())
-                  ? app.submittedAt
-                  : dateObj.toLocaleDateString("ms-MY", { day: "numeric", month: "short", year: "numeric" });
+                const formattedDate = app.submittedAt;
 
                 return (
                   <div
@@ -268,4 +265,27 @@ export default function DashboardPage() {
       </section>
     </div>
   );
+}
+
+function formatFirestoreDate(value: unknown) {
+  const date = toDate(value);
+  if (!date) {
+    return "Pending";
+  }
+  return new Intl.DateTimeFormat("ms-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function toDate(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value) {
+    return (value as Timestamp).toDate();
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
 }

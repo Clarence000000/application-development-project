@@ -86,44 +86,16 @@ export default function ReviewStatusPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const q = query(
-            collection(db, "applications"),
-            where("userId", "==", user.uid)
+          const querySnap = await getDocs(
+            query(collection(db, "applications"), where("userId", "==", user.uid))
           );
-          const querySnap = await getDocs(q);
-          const appsList: Application[] = [];
+          const appsList = querySnap.docs
+            .map((documentSnapshot) =>
+              mapFirestoreApplication(documentSnapshot.id, documentSnapshot.data())
+            )
+            .sort((left, right) => right.sortTime - left.sortTime)
+            .map(({ sortTime: _sortTime, ...application }) => application);
 
-          querySnap.forEach((doc) => {
-            const data = doc.data();
-            const dateObj = new Date(data.submittedAt);
-            const formattedDate = isNaN(dateObj.getTime())
-              ? data.submittedAt
-              : dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-            const statusInfo = mapStatusStyles(data.status);
-
-            appsList.push({
-              id: data.id,
-              type: data.type,
-              category: mapCategory(data.type),
-              title: data.title,
-              date: formattedDate,
-              meta: data.meta || "Pejabat Penghulu Mukim Ayer Hitam",
-              status: statusInfo.status,
-              statusColor: statusInfo.statusColor,
-              statusBg: statusInfo.statusBg,
-              statusDot: statusInfo.statusDot,
-              warning: data.warning,
-              link: `/new-application`, // Fallback link
-              timeline: data.timeline || [
-                { title: "Permohonan Draf", date: formattedDate, desc: "Pemohon mula mengisi borang", done: true },
-                { title: "Permohonan Dihantar", date: formattedDate, desc: "Permohonan berjaya dihantar", done: true }
-              ]
-            });
-          });
-
-          // Sort client-side descending by submission time
-          appsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setApplications(appsList);
         } catch (err) {
           console.error("Error loading application statuses: ", err);
@@ -148,9 +120,10 @@ export default function ReviewStatusPage() {
 
   // Filter application list
   const filteredApps = applications.filter((app) => {
+    const searchText = search.toLowerCase();
     const matchesSearch =
-      app.id.toLowerCase().includes(search.toLowerCase()) ||
-      app.title.toLowerCase().includes(search.toLowerCase());
+      readString(app.id).toLowerCase().includes(searchText) ||
+      readString(app.title).toLowerCase().includes(searchText);
     const matchesStatus =
       statusFilter === "All Statuses" || app.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -560,15 +533,15 @@ function mapFirestoreApplication(id: string, data: Record<string, unknown>): App
   const approvedAt = formatFirestoreDate(data.approvedAt);
   const submittedDate = toDate(data.submittedAt);
   const serialNumber = readString(data.serialNumber);
-  const title = readString(data.formType) || "Permohonan Penghulu";
+  const title = readString(data.formType) || readString(data.title) || "Permohonan Penghulu";
 
   return {
-    id: readString(data.referenceNumber) || readString(data.applicationId) || id,
+    id: readString(data.referenceNumber) || readString(data.applicationId) || readString(data.id) || id,
     type: title,
-    category: readString(data.formSlug),
+    category: readString(data.formSlug) || readString(data.type),
     title,
     date: submittedAt,
-    meta: "Pejabat Penghulu",
+    meta: readString(data.meta) || "Pejabat Penghulu",
     status,
     ...statusStyle(status),
     serialNumber: serialNumber || undefined,
