@@ -350,7 +350,11 @@ export default function PortalLayout({
               >
                 {item.icon}
               </span>
-              <span className="text-[10px]">{item.name.replace("Application", "Apply").replace("Review Status", "Status")}</span>
+              <span className="text-[10px]">
+                {item.name
+                  .replace("Application", "Apply")
+                  .replace("Review Status", "Status")}
+              </span>
             </Link>
           );
         })}

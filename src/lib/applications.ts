@@ -17,12 +17,22 @@ export type FirestoreApplication = {
   applicationId: string;
   referenceNumber: string;
   uid: string;
+  userId: string;
   formType: string;
   formSlug: ApplicationSlug;
+  type: ApplicationSlug;
+  title: string;
   status: ApplicationStatus;
   submittedAt: Timestamp | FieldValue;
   updatedAt: Timestamp | FieldValue;
   values: ApplicationValues;
+  meta: string;
+  timeline: {
+    title: string;
+    date: string;
+    desc: string;
+    done: boolean;
+  }[];
   serialNumber: string | null;
   approvedAt: Timestamp | FieldValue | null;
   approvedBy: string | null;
@@ -43,16 +53,47 @@ export async function createApplicationDocument({
 }) {
   const applicationRef = doc(collection(db, "applications"));
   const referenceNumber = generateReferenceNumber();
+  const timelineDate = new Date().toLocaleDateString("ms-MY");
   const application: FirestoreApplication = {
     applicationId: applicationRef.id,
     referenceNumber,
     uid,
+    userId: uid,
     formType: config.title,
     formSlug: config.slug,
+    type: config.slug,
+    title: config.title,
     status: "Pending",
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     values,
+    meta: "Pejabat Penghulu Mukim Ayer Hitam",
+    timeline: [
+      {
+        title: "Permohonan Draf",
+        date: timelineDate,
+        desc: "Pemohon mula mengisi borang",
+        done: true,
+      },
+      {
+        title: "Permohonan Dihantar",
+        date: timelineDate,
+        desc: "Permohonan berjaya dihantar ke Pejabat Penghulu",
+        done: true,
+      },
+      {
+        title: "Dalam Semakan",
+        date: "Pending",
+        desc: "Menunggu pengesahan daripada Penghulu",
+        done: false,
+      },
+      {
+        title: "Kelulusan Akhir",
+        date: "Pending",
+        desc: "Pengeluaran sijil rasmi",
+        done: false,
+      },
+    ],
     serialNumber: null,
     approvedAt: null,
     approvedBy: null,

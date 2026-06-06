@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, query, where, type Timestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
 
 interface Application {
   id: string;
@@ -24,139 +25,118 @@ interface Application {
   timeline: { title: string; date: string; desc: string; done: boolean }[];
 }
 
-const mockApplications: Application[] = [
-  {
-    id: "GC-2023-8842",
-    type: "Verification of Residence",
-    category: "Renewable",
-    title: "Verification of Residence",
-    date: "Oct 24, 2023",
-    meta: "Pejabat Penghulu Mukim A",
-    status: "In Review",
-    statusColor: "text-on-secondary-container",
-    statusBg: "bg-secondary-container",
-    statusDot: "bg-on-secondary-container",
-    timeline: [
-      { title: "Application Drafted", date: "Oct 23, 2023", desc: "Citizen initiated the form", done: true },
-      { title: "Application Submitted", date: "Oct 24, 2023", desc: "Transferred to Penghulu Office", done: true },
-      { title: "Under Review", date: "Oct 24, 2023", desc: "Awaiting local Penghulu validation", done: true },
-      { title: "Final Approval", date: "Pending", desc: "Issuance of residency certificate", done: false },
-    ],
-  },
-  {
-    id: "GC-2023-7721",
-    type: "Income Declaration Certificate",
-    title: "Income Declaration Certificate",
-    date: "Oct 12, 2023",
-    meta: "Self-employed",
-    status: "Approved",
-    statusColor: "text-green-800",
-    statusBg: "bg-green-100",
-    statusDot: "bg-green-600",
-    downloadUrl: "/api/applications/GC-2023-7721/pdf",
-    serialNumber: "PPP-2023-X8F9A2",
-    timeline: [
-      { title: "Application Drafted", date: "Oct 10, 2023", desc: "Citizen initiated the form", done: true },
-      { title: "Application Submitted", date: "Oct 12, 2023", desc: "Transferred to Penghulu Office", done: true },
-      { title: "Under Review", date: "Oct 13, 2023", desc: "Penghulu verified bank statement", done: true },
-      { title: "Approved & Issued", date: "Oct 15, 2023", desc: "Digital certificate generated", done: true },
-    ],
-  },
-  {
-    id: "GC-2023-8843",
-    type: "Borang Pengesahan Bermastautin",
-    category: "Residential",
-    title: "Borang Pengesahan Bermastautin",
-    date: "Oct 12, 2023",
-    meta: "Pejabat Penghulu Mukim A",
-    status: "Approved",
-    statusColor: "text-green-800",
-    statusBg: "bg-green-100",
-    statusDot: "bg-green-600",
-    downloadUrl: "/api/applications/GC-2023-8843/pdf",
-    serialNumber: "PPP-2023-B7C4D1",
-    timeline: [
-      { title: "Application Drafted", date: "Oct 10, 2023", desc: "Citizen initiated the form", done: true },
-      { title: "Application Submitted", date: "Oct 11, 2023", desc: "Transferred to Penghulu Office", done: true },
-      { title: "Under Review", date: "Oct 11, 2023", desc: "Residential details verified by office staff", done: true },
-      { title: "Approved & Issued", date: "Oct 12, 2023", desc: "Digital certificate generated", done: true },
-    ],
-  },
-  {
-    id: "GC-2023-6615",
-    type: "Bantuan Sara Hidup Verification",
-    title: "Bantuan Sara Hidup Verification",
-    date: "Sep 28, 2023",
-    meta: "Pejabat Penghulu Mukim A",
-    status: "Action Required",
-    statusColor: "text-on-error-container",
-    statusBg: "bg-error-container",
-    statusDot: "bg-error",
-    warning: "Missing IC Copy",
-    timeline: [
-      { title: "Application Drafted", date: "Sep 26, 2023", desc: "Citizen initiated the form", done: true },
-      { title: "Application Submitted", date: "Sep 28, 2023", desc: "Transferred to Penghulu Office", done: true },
-      { title: "Information Request", date: "Sep 29, 2023", desc: "Penghulu requested clear IC front & back image copy", done: true },
-    ],
-  },
-  {
-    id: "DRAFT-9921",
-    type: "Character Reference Letter",
-    title: "Character Reference Letter",
-    date: "Last edited: 2 days ago",
-    meta: "Sub-district admin",
-    status: "Draft",
-    statusColor: "text-on-surface-variant",
-    statusBg: "bg-surface-container-high",
-    statusDot: "bg-outline",
-    link: "/new-application",
-    timeline: [
-      { title: "Draft Created", date: "2 days ago", desc: "Form content partially saved", done: true },
-      { title: "Application Submitted", date: "Pending", desc: "Final verification needed", done: false },
-    ],
-  },
-];
+const mapStatusStyles = (status: string) => {
+  switch (status) {
+    case "Approved":
+      return {
+        status: "Approved" as const,
+        statusColor: "text-green-800",
+        statusBg: "bg-green-100",
+        statusDot: "bg-green-600",
+      };
+    case "Action Required":
+      return {
+        status: "Action Required" as const,
+        statusColor: "text-on-error-container",
+        statusBg: "bg-error-container",
+        statusDot: "bg-error",
+      };
+    case "Draft":
+      return {
+        status: "Draft" as const,
+        statusColor: "text-on-surface-variant",
+        statusBg: "bg-surface-container-high",
+        statusDot: "bg-outline",
+      };
+    default: // "Pending" or "In Review"
+      return {
+        status: "In Review" as const,
+        statusColor: "text-on-secondary-container",
+        statusBg: "bg-secondary-container",
+        statusDot: "bg-on-secondary-container",
+      };
+  }
+};
+
+const mapCategory = (type: string) => {
+  switch (type) {
+    case "residential":
+      return "Residential";
+    case "income":
+      return "Finance";
+    case "ic_penalty":
+      return "Appeal";
+    default:
+      return "General";
+  }
+};
 
 export default function ReviewStatusPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-  const [applications, setApplications] = useState<Application[]>(mockApplications);
+
+  const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        setApplications(mockApplications);
-        setIsLoading(false);
-        return;
-      }
+      if (user) {
+        try {
+          const q = query(
+            collection(db, "applications"),
+            where("userId", "==", user.uid)
+          );
+          const querySnap = await getDocs(q);
+          const appsList: Application[] = [];
 
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, "applications"), where("uid", "==", user.uid))
-        );
-        const firestoreApplications = snapshot.docs.map((documentSnapshot) =>
-          mapFirestoreApplication(documentSnapshot.id, documentSnapshot.data())
-        ).sort((left, right) => right.sortTime - left.sortTime);
+          querySnap.forEach((doc) => {
+            const data = doc.data();
+            const dateObj = new Date(data.submittedAt);
+            const formattedDate = isNaN(dateObj.getTime())
+              ? data.submittedAt
+              : dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-        setApplications(
-          firestoreApplications.length > 0
-            ? firestoreApplications.map(({ sortTime: _sortTime, ...application }) => application)
-            : mockApplications
-        );
-      } catch (error) {
-        console.error("Failed to load applications", error);
-        setApplications(mockApplications);
-      } finally {
-        setIsLoading(false);
+            const statusInfo = mapStatusStyles(data.status);
+
+            appsList.push({
+              id: data.id,
+              type: data.type,
+              category: mapCategory(data.type),
+              title: data.title,
+              date: formattedDate,
+              meta: data.meta || "Pejabat Penghulu Mukim Ayer Hitam",
+              status: statusInfo.status,
+              statusColor: statusInfo.statusColor,
+              statusBg: statusInfo.statusBg,
+              statusDot: statusInfo.statusDot,
+              warning: data.warning,
+              link: `/new-application`, // Fallback link
+              timeline: data.timeline || [
+                { title: "Permohonan Draf", date: formattedDate, desc: "Pemohon mula mengisi borang", done: true },
+                { title: "Permohonan Dihantar", date: formattedDate, desc: "Permohonan berjaya dihantar", done: true }
+              ]
+            });
+          });
+
+          // Sort client-side descending by submission time
+          appsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setApplications(appsList);
+        } catch (err) {
+          console.error("Error loading application statuses: ", err);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        router.push("/login");
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -178,9 +158,7 @@ export default function ReviewStatusPage() {
 
   // Calculate statistics dynamically
   const approvedCount = applications.filter((a) => a.status === "Approved").length;
-  const inReviewCount = applications.filter(
-    (a) => a.status === "In Review" || a.status === "Pending"
-  ).length;
+  const inReviewCount = applications.filter((a) => a.status === "In Review").length;
   const actionRequiredCount = applications.filter((a) => a.status === "Action Required").length;
 
   return (
@@ -207,7 +185,7 @@ export default function ReviewStatusPage() {
               </span>
               <input
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm text-on-surface"
-                placeholder="e.g. GC-2023-8842 or Residence"
+                placeholder="e.g. APP- or Residence"
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -250,8 +228,8 @@ export default function ReviewStatusPage() {
       {/* Applications List */}
       <div className="space-y-3">
         {isLoading ? (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 text-center">
-            <p className="text-sm font-bold text-primary">Loading applications...</p>
+          <div className="text-center py-12 text-sm text-secondary font-medium">
+            Sila tunggu, memuatkan maklumat permohonan...
           </div>
         ) : filteredApps.length > 0 ? (
           filteredApps.map((app) => (
@@ -368,7 +346,7 @@ export default function ReviewStatusPage() {
             </span>
             <h4 className="text-sm font-bold text-on-surface">No applications found</h4>
             <p className="text-xs text-on-surface-variant mt-1 max-w-xs font-medium">
-              Try adjusting your search criteria or status filter to locate your record.
+              Tiada permohonan ditemui.
             </p>
           </div>
         )}
@@ -406,7 +384,7 @@ export default function ReviewStatusPage() {
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
               Pending Action
             </div>
-            <div className="text-sm font-bold text-error">{actionRequiredCount} Application</div>
+            <div className="text-sm font-bold text-error">{actionRequiredCount} Applications</div>
           </div>
         </div>
       </div>
