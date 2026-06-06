@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs, type Timestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  type Timestamp,
+} from "firebase/firestore";
 
 interface Application {
   id: string;
@@ -38,22 +46,34 @@ export default function DashboardPage() {
           // 2. Fetch user's applications
           const q = query(
             collection(db, "applications"),
-            where("userId", "==", user.uid)
+            where("userId", "==", user.uid),
           );
           const querySnap = await getDocs(q);
-          const appsList: Application[] = [];
+          const rawAppsList: any[] = [];
+
           querySnap.forEach((documentSnapshot) => {
-            const data = documentSnapshot.data();
-            appsList.push({
-              id: data.referenceNumber || data.applicationId || data.id || documentSnapshot.id,
-              type: data.formSlug || data.type,
-              title: data.formType || data.title || "Permohonan Penghulu",
-              submittedAt: formatFirestoreDate(data.submittedAt),
-              status: data.status || "In Review",
+            rawAppsList.push({
+              id: documentSnapshot.id,
+              ...documentSnapshot.data(),
             });
           });
-          // Sort client-side descending by submittedAt
-          appsList.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+          // 1. Sort by the raw Firestore timestamp FIRST (descending)
+          rawAppsList.sort((a, b) => {
+            const timeA = toDate(a.submittedAt)?.getTime() || 0;
+            const timeB = toDate(b.submittedAt)?.getTime() || 0;
+            return timeB - timeA;
+          });
+
+          // 2. Format and map to the specific properties need for the UI
+          const appsList: Application[] = rawAppsList.map((data) => ({
+            id: data.referenceNumber || data.applicationId || data.id, // ID already handled above
+            type: data.formSlug || data.type,
+            title: data.formType || data.title || "Permohonan Penghulu",
+            submittedAt: formatFirestoreDate(data.submittedAt), // Format happens safely AFTER sort
+            status: data.status || "In Review",
+          }));
+
           setApplications(appsList.slice(0, 3));
         } catch (err) {
           console.error("Error loading dashboard data: ", err);
@@ -76,7 +96,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-primary mb-0.5">
-          {isLoading ? "Sila tunggu..." : `Selamat Datang, ${userName || "Pemohon"}`}
+          {isLoading
+            ? "Sila tunggu..."
+            : `Selamat Datang, ${userName || "Pemohon"}`}
         </h1>
         <p className="text-sm text-secondary">
           Quick access to your certificate applications and latest status.
@@ -86,13 +108,17 @@ export default function DashboardPage() {
       {/* Certificate Options */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-on-surface">Apply for a Certificate</h2>
+          <h2 className="text-lg font-bold text-on-surface">
+            Apply for a Certificate
+          </h2>
           <Link
             className="text-primary text-sm font-semibold hover:underline flex items-center gap-1"
             href="/new-application"
           >
             <span>View All</span>
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            <span className="material-symbols-outlined text-sm">
+              arrow_forward
+            </span>
           </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -114,7 +140,9 @@ export default function DashboardPage() {
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
               <span>Start Application</span>
-              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              <span className="material-symbols-outlined text-sm">
+                arrow_forward
+              </span>
             </button>
           </div>
 
@@ -132,11 +160,14 @@ export default function DashboardPage() {
               Borang Pengesahan Pendapatan
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
-              Income verification certificate for various official and welfare purposes.
+              Income verification certificate for various official and welfare
+              purposes.
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
               <span>Start Application</span>
-              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              <span className="material-symbols-outlined text-sm">
+                arrow_forward
+              </span>
             </button>
           </div>
 
@@ -154,11 +185,14 @@ export default function DashboardPage() {
               Rayuan Bayaran Denda IC
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
-              Appeal for reduction of IC damage or loss fines with sub-district verification.
+              Appeal for reduction of IC damage or loss fines with sub-district
+              verification.
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
               <span>Start Application</span>
-              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              <span className="material-symbols-outlined text-sm">
+                arrow_forward
+              </span>
             </button>
           </div>
         </div>
@@ -167,13 +201,17 @@ export default function DashboardPage() {
       {/* Application Status */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-on-surface">Application Status</h2>
+          <h2 className="text-lg font-bold text-on-surface">
+            Application Status
+          </h2>
           <Link
             className="text-primary text-sm font-semibold flex items-center hover:underline"
             href="/review-status"
           >
             <span>View All</span>
-            <span className="material-symbols-outlined text-sm ml-1">open_in_new</span>
+            <span className="material-symbols-outlined text-sm ml-1">
+              open_in_new
+            </span>
           </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -208,13 +246,15 @@ export default function DashboardPage() {
                 }
 
                 let statusText = "In Review";
-                let statusClass = "bg-secondary-container text-on-secondary-container";
+                let statusClass =
+                  "bg-secondary-container text-on-secondary-container";
                 if (isApproved) {
                   statusText = "Approved";
                   statusClass = "bg-green-100 text-green-800";
                 } else if (isDraft) {
                   statusText = "Draft";
-                  statusClass = "bg-surface-container-highest text-on-surface-variant";
+                  statusClass =
+                    "bg-surface-container-highest text-on-surface-variant";
                 } else if (isActionRequired) {
                   statusText = "Action Required";
                   statusClass = "bg-error-container text-on-error-container";
@@ -228,30 +268,45 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={app.id}
-                    className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => handleCardClick("/review-status")}
+                    className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer hover:border-primary"
+                    onClick={() => router.push(`/review-status?focus=${encodeURIComponent(app.id)}`)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full ${iconBg} flex items-center justify-center`}>
-                        <span className={`material-symbols-outlined ${iconColor} text-xl`}>{iconName}</span>
+                      <div
+                        className={`w-9 h-9 rounded-full ${iconBg} flex items-center justify-center`}
+                      >
+                        <span
+                          className={`material-symbols-outlined ${iconColor} text-xl`}
+                        >
+                          {iconName}
+                        </span>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-on-surface">{app.title}</p>
-                        <p className="text-[11px] text-on-surface-variant">Dihantar pada {formattedDate}</p>
+                        <p className="text-sm font-semibold text-on-surface">
+                          {app.title}
+                        </p>
+                        <p className="text-[11px] text-on-surface-variant">
+                          Dihantar pada {formattedDate}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 rounded-full ${statusClass} text-[10px] font-bold uppercase tracking-wider`}>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-full ${statusClass} text-[10px] font-bold uppercase tracking-wider whitespace-nowrap`}
+                      >
                         {statusText}
                       </span>
-                      <span className="material-symbols-outlined text-outline text-lg">chevron_right</span>
+                      <span className="material-symbols-outlined text-outline text-lg">
+                        chevron_right
+                      </span>
                     </div>
                   </div>
                 );
               })
             ) : (
               <div className="bg-white border border-outline-variant border-dashed rounded-lg p-6 text-center text-xs text-on-surface-variant">
-                Tiada permohonan aktif ditemui. Sila klik "Apply for a Certificate" untuk membuat permohonan baru.
+                Tiada permohonan aktif ditemui. Sila klik "Apply for a
+                Certificate" untuk membuat permohonan baru.
               </div>
             )}
           </div>
@@ -259,10 +314,13 @@ export default function DashboardPage() {
           {/* Guidelines Sidebar */}
           <div className="p-8 rounded-lg border border-outline-variant flex flex-col items-center justify-center text-center bg-surface-container-lowest">
             <div className="mb-2 text-primary">
-              <span className="material-symbols-outlined text-3xl">history_edu</span>
+              <span className="material-symbols-outlined text-3xl">
+                history_edu
+              </span>
             </div>
             <p className="text-xs text-on-surface-variant max-w-[200px]">
-              Sejarah permohonan anda dipaparkan mengikut kemas kini terbaru secara langsung dari sistem.
+              Sejarah permohonan anda dipaparkan mengikut kemas kini terbaru
+              secara langsung dari sistem.
             </p>
           </div>
         </div>

@@ -2,10 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs, query, where, type Timestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  type Timestamp,
+} from "firebase/firestore";
 
 interface Application {
   id: string;
@@ -73,25 +80,56 @@ const mapCategory = (type: string) => {
 
 export default function ReviewStatusPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusedId = searchParams.get("focus");
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeFocusId, setActiveFocusId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusedId || isLoading || applications.length === 0) return;
+
+    setActiveFocusId(focusedId);
+
+    const scrollTimer = window.setTimeout(() => {
+      cardRefs.current[focusedId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+
+    const highlightTimer = window.setTimeout(() => {
+      setActiveFocusId(null);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [focusedId, isLoading, applications]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
           const querySnap = await getDocs(
-            query(collection(db, "applications"), where("userId", "==", user.uid))
+            query(
+              collection(db, "applications"),
+              where("userId", "==", user.uid),
+            ),
           );
           const appsList = querySnap.docs
             .map((documentSnapshot) =>
-              mapFirestoreApplication(documentSnapshot.id, documentSnapshot.data())
+              mapFirestoreApplication(
+                documentSnapshot.id,
+                documentSnapshot.data(),
+              ),
             )
             .sort((left, right) => right.sortTime - left.sortTime)
             .map(({ sortTime: _sortTime, ...application }) => application);
@@ -130,18 +168,29 @@ export default function ReviewStatusPage() {
   });
 
   // Calculate statistics dynamically
-  const approvedCount = applications.filter((a) => a.status === "Approved").length;
-  const inReviewCount = applications.filter((a) => a.status === "In Review").length;
-  const actionRequiredCount = applications.filter((a) => a.status === "Action Required").length;
+  const approvedCount = applications.filter(
+    (a) => a.status === "Approved",
+  ).length;
+  const inReviewCount = applications.filter(
+    (a) => a.status === "In Review",
+  ).length;
+  const actionRequiredCount = applications.filter(
+    (a) => a.status === "Action Required",
+  ).length;
+  const rejectedCount = applications.filter(
+    (a) => a.status === "Rejected",
+  ).length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Section */}
       <section className="space-y-1">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-tight">Review Status</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-tight">
+          Review Status
+        </h1>
         <p className="text-sm text-on-surface-variant max-w-xl">
-          Track the progress of your submitted documents and verification requests. Real-time updates
-          on your official government applications.
+          Track the progress of your submitted documents and verification
+          requests. Real-time updates on your official government applications.
         </p>
       </section>
 
@@ -190,7 +239,9 @@ export default function ReviewStatusPage() {
               }}
               className="w-full bg-primary text-white font-semibold text-sm px-4 py-2 rounded-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+              <span className="material-symbols-outlined text-[18px]">
+                restart_alt
+              </span>
               Clear
             </button>
           </div>
@@ -206,29 +257,38 @@ export default function ReviewStatusPage() {
         ) : filteredApps.length > 0 ? (
           filteredApps.map((app) => (
             <div
+              ref={(element) => {
+                cardRefs.current[app.id] = element;
+              }}
               key={app.id}
-              className="group bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className={`group bg-surface-container-lowest border rounded-xl p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                activeFocusId === app.id
+                  ? "border-primary ring-2 ring-primary/40 animate-pulse"
+                  : "border-outline-variant hover:border-primary"
+              }`}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                     app.status === "Approved"
                       ? "bg-green-50 text-green-700 border border-green-200"
-                      : app.status === "Action Required"
-                      ? "bg-error-container text-on-error-container"
-                      : app.status === "In Review"
-                      ? "bg-primary-container text-white"
-                      : "bg-surface-container text-on-surface-variant"
+                      : app.status === "Action Required" ||
+                          app.status === "Rejected"
+                        ? "bg-error-container text-on-error-container"
+                        : app.status === "In Review"
+                          ? "bg-primary-container text-white"
+                          : "bg-surface-container text-on-surface-variant"
                   }`}
                 >
                   <span className="material-symbols-outlined text-[20px]">
                     {app.status === "Approved"
                       ? "verified"
-                      : app.status === "Action Required"
-                      ? "warning"
-                      : app.status === "In Review"
-                      ? "description"
-                      : "edit_note"}
+                      : app.status === "Action Required" ||
+                          app.status === "Rejected"
+                        ? "warning"
+                        : app.status === "In Review"
+                          ? "description"
+                          : "edit_note"}
                   </span>
                 </div>
                 <div className="space-y-0.5">
@@ -242,25 +302,35 @@ export default function ReviewStatusPage() {
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm font-bold text-on-surface">{app.title}</h3>
+                  <h3 className="text-sm font-bold text-on-surface">
+                    {app.title}
+                  </h3>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant font-medium">
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                      <span className="material-symbols-outlined text-[14px]">
+                        calendar_today
+                      </span>
                       {app.date}
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">location_on</span>
+                      <span className="material-symbols-outlined text-[14px]">
+                        location_on
+                      </span>
                       {app.meta}
                     </span>
                     {app.warning && (
                       <span className="flex items-center gap-1 text-error font-semibold">
-                        <span className="material-symbols-outlined text-[14px]">error</span>
+                        <span className="material-symbols-outlined text-[14px]">
+                          error
+                        </span>
                         {app.warning}
                       </span>
                     )}
                     {app.serialNumber && (
                       <span className="flex items-center gap-1 text-green-700 font-bold">
-                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                        <span className="material-symbols-outlined text-[14px]">
+                          verified_user
+                        </span>
                         {app.serialNumber}
                       </span>
                     )}
@@ -275,7 +345,9 @@ export default function ReviewStatusPage() {
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${app.statusBg} ${app.statusColor}`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${app.statusDot}`}></span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${app.statusDot}`}
+                    ></span>
                     <span className="text-xs font-semibold">{app.status}</span>
                   </div>
                 </div>
@@ -285,7 +357,9 @@ export default function ReviewStatusPage() {
                     className="bg-primary text-white font-semibold text-xs px-4 py-2 rounded-lg hover:opacity-95 active:scale-95 transition-all flex items-center gap-1"
                   >
                     Resume
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    <span className="material-symbols-outlined text-[16px]">
+                      arrow_forward
+                    </span>
                   </Link>
                 ) : (
                   <div className="flex flex-wrap justify-end gap-2">
@@ -295,7 +369,9 @@ export default function ReviewStatusPage() {
                         download
                         className="bg-green-700 text-white font-semibold text-xs px-4 py-2 rounded-lg hover:bg-green-800 transition-all flex items-center gap-1"
                       >
-                        <span className="material-symbols-outlined text-[16px]">download</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          download
+                        </span>
                         PDF
                       </a>
                     )}
@@ -304,7 +380,9 @@ export default function ReviewStatusPage() {
                       className="bg-surface-container-highest text-primary font-semibold text-xs px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all flex items-center gap-1 cursor-pointer"
                     >
                       View Details
-                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                      <span className="material-symbols-outlined text-[16px]">
+                        chevron_right
+                      </span>
                     </button>
                   </div>
                 )}
@@ -316,7 +394,9 @@ export default function ReviewStatusPage() {
             <span className="material-symbols-outlined text-4xl text-outline mb-2">
               search_off
             </span>
-            <h4 className="text-sm font-bold text-on-surface">No applications found</h4>
+            <h4 className="text-sm font-bold text-on-surface">
+              No applications found
+            </h4>
             <p className="text-xs text-on-surface-variant mt-1 max-w-xs font-medium">
               Tiada permohonan ditemui.
             </p>
@@ -325,38 +405,65 @@ export default function ReviewStatusPage() {
       </div>
 
       {/* Footer Info / Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-8">
         <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white shrink-0">
-            <span className="material-symbols-outlined text-[18px]">assignment_turned_in</span>
+            <span className="material-symbols-outlined text-[18px]">
+              assignment_turned_in
+            </span>
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
               Total Approved
             </div>
-            <div className="text-sm font-bold text-primary">{approvedCount} Applications</div>
+            <div className="text-sm font-bold text-primary">
+              {approvedCount} Applications
+            </div>
           </div>
         </div>
         <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#1e3a8a] flex items-center justify-center text-white shrink-0">
-            <span className="material-symbols-outlined text-[18px]">pending</span>
+            <span className="material-symbols-outlined text-[18px]">
+              pending
+            </span>
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
               In Progress
             </div>
-            <div className="text-sm font-bold text-primary">{inReviewCount} Applications</div>
+            <div className="text-sm font-bold text-primary">
+              {inReviewCount} Applications
+            </div>
           </div>
         </div>
         <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-error flex items-center justify-center text-white shrink-0">
-            <span className="material-symbols-outlined text-[18px]">error_outline</span>
+            <span className="material-symbols-outlined text-[18px]">
+              error_outline
+            </span>
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
               Pending Action
             </div>
-            <div className="text-sm font-bold text-error">{actionRequiredCount} Applications</div>
+            <div className="text-sm font-bold text-error">
+              {actionRequiredCount} Applications
+            </div>
+          </div>
+        </div>
+        <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-error flex items-center justify-center text-white shrink-0">
+            <span className="material-symbols-outlined text-[18px]">
+              error_outline
+            </span>
+          </div>
+          <div>
+            <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
+              Rejected
+            </div>
+            <div className="text-sm font-bold text-error">
+              {rejectedCount} Applications
+            </div>
           </div>
         </div>
       </div>
@@ -365,7 +472,10 @@ export default function ReviewStatusPage() {
       {selectedApp && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end backdrop-blur-sm animate-fade-in">
           {/* Backdrop Click Dismisses */}
-          <div className="absolute inset-0" onClick={() => setSelectedApp(null)}></div>
+          <div
+            className="absolute inset-0"
+            onClick={() => setSelectedApp(null)}
+          ></div>
 
           {/* Drawer Body */}
           <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col z-10 animate-slide-in-right">
@@ -392,11 +502,15 @@ export default function ReviewStatusPage() {
               {/* Status Section */}
               <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/45 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface-variant">Application Status</span>
+                  <span className="text-xs font-bold text-on-surface-variant">
+                    Application Status
+                  </span>
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${selectedApp.statusBg} ${selectedApp.statusColor}`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${selectedApp.statusDot}`}></span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${selectedApp.statusDot}`}
+                    ></span>
                     {selectedApp.status}
                   </div>
                 </div>
@@ -418,8 +532,12 @@ export default function ReviewStatusPage() {
                       verified_user
                     </span>
                     <div>
-                      <p className="text-green-900 font-bold">AI-Validated Serial Number</p>
-                      <p className="text-green-800 font-semibold">{selectedApp.serialNumber}</p>
+                      <p className="text-green-900 font-bold">
+                        AI-Validated Serial Number
+                      </p>
+                      <p className="text-green-800 font-semibold">
+                        {selectedApp.serialNumber}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -432,12 +550,20 @@ export default function ReviewStatusPage() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <span className="text-on-surface-variant block font-medium">Date Filed</span>
-                    <span className="font-bold text-on-surface mt-0.5 block">{selectedApp.date}</span>
+                    <span className="text-on-surface-variant block font-medium">
+                      Date Filed
+                    </span>
+                    <span className="font-bold text-on-surface mt-0.5 block">
+                      {selectedApp.date}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-on-surface-variant block font-medium">Authority Agency</span>
-                    <span className="font-bold text-on-surface mt-0.5 block">{selectedApp.meta}</span>
+                    <span className="text-on-surface-variant block font-medium">
+                      Authority Agency
+                    </span>
+                    <span className="font-bold text-on-surface mt-0.5 block">
+                      {selectedApp.meta}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -453,7 +579,9 @@ export default function ReviewStatusPage() {
                       {/* Timeline Dot */}
                       <span
                         className={`absolute -left-[26px] top-0.5 w-3 h-3 rounded-full border-2 bg-white ${
-                          step.done ? "border-primary" : "border-outline-variant"
+                          step.done
+                            ? "border-primary"
+                            : "border-outline-variant"
                         }`}
                       ></span>
 
@@ -461,7 +589,9 @@ export default function ReviewStatusPage() {
                         <div className="flex items-center justify-between text-xs">
                           <span
                             className={`font-bold ${
-                              step.done ? "text-primary" : "text-on-surface-variant"
+                              step.done
+                                ? "text-primary"
+                                : "text-on-surface-variant"
                             }`}
                           >
                             {step.title}
@@ -488,7 +618,9 @@ export default function ReviewStatusPage() {
                   download
                   className="flex-1 bg-green-700 text-white font-bold text-xs py-2.5 rounded-lg hover:bg-green-800 active:scale-95 transition-all flex items-center justify-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-sm">download</span>
+                  <span className="material-symbols-outlined text-sm">
+                    download
+                  </span>
                   Download PDF
                 </a>
               )}
@@ -496,11 +628,15 @@ export default function ReviewStatusPage() {
                 <button
                   onClick={() => {
                     setSelectedApp(null);
-                    triggerToast("Action resolved. Upload submitted successfully!");
+                    triggerToast(
+                      "Action resolved. Upload submitted successfully!",
+                    );
                   }}
                   className="flex-1 bg-primary text-white font-bold text-xs py-2.5 rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-sm">cloud_upload</span>
+                  <span className="material-symbols-outlined text-sm">
+                    cloud_upload
+                  </span>
                   Upload Missing Copy
                 </button>
               )}
@@ -518,7 +654,9 @@ export default function ReviewStatusPage() {
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-20 right-6 md:right-10 bg-inverse-surface text-inverse-on-surface px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-xs font-semibold z-50 animate-fade-in">
-          <span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>
+          <span className="material-symbols-outlined text-green-400 text-sm">
+            check_circle
+          </span>
           {toastMessage}
         </div>
       )}
@@ -526,16 +664,27 @@ export default function ReviewStatusPage() {
   );
 }
 
-function mapFirestoreApplication(id: string, data: Record<string, unknown>): Application & { sortTime: number } {
+function mapFirestoreApplication(
+  id: string,
+  data: Record<string, unknown>,
+): Application & { sortTime: number } {
   const status = mapStatus(data.status);
   const submittedAt = formatFirestoreDate(data.submittedAt);
   const approvedAt = formatFirestoreDate(data.approvedAt);
+  const rejectedAt = formatFirestoreDate(data.rejectedAt);
   const submittedDate = toDate(data.submittedAt);
   const serialNumber = readString(data.serialNumber);
-  const title = readString(data.formType) || readString(data.title) || "Permohonan Penghulu";
+  const title =
+    readString(data.formType) ||
+    readString(data.title) ||
+    "Permohonan Penghulu";
 
   return {
-    id: readString(data.referenceNumber) || readString(data.applicationId) || readString(data.id) || id,
+    id:
+      readString(data.referenceNumber) ||
+      readString(data.applicationId) ||
+      readString(data.id) ||
+      id,
     type: title,
     category: readString(data.formSlug) || readString(data.type),
     title,
@@ -544,14 +693,23 @@ function mapFirestoreApplication(id: string, data: Record<string, unknown>): App
     status,
     ...statusStyle(status),
     serialNumber: serialNumber || undefined,
-    downloadUrl: status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
-    warning: status === "Rejected" ? readString(data.rejectionReason) || "Application rejected" : undefined,
-    timeline: buildTimeline(status, submittedAt, approvedAt),
+    downloadUrl:
+      status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
+    warning:
+      status === "Rejected"
+        ? readString(data.rejectionReason) || "Application rejected"
+        : undefined,
+    timeline: buildTimeline(status, submittedAt, approvedAt, rejectedAt),
     sortTime: submittedDate?.getTime() || 0,
   };
 }
 
-function buildTimeline(status: Application["status"], submittedAt: string, approvedAt: string) {
+function buildTimeline(
+  status: Application["status"],
+  submittedAt: string,
+  approvedAt: string,
+  rejectedAt: string,
+) {
   return [
     {
       title: "Application Submitted",
@@ -567,13 +725,18 @@ function buildTimeline(status: Application["status"], submittedAt: string, appro
     },
     {
       title: status === "Rejected" ? "Rejected" : "Approved & Issued",
-      date: status === "Approved" ? approvedAt : status === "Rejected" ? "Completed" : "In Review",
+      date:
+        status === "Approved"
+          ? approvedAt
+          : status === "Rejected"
+            ? rejectedAt
+            : "In Review",
       desc:
         status === "Approved"
           ? "Digital certificate and serial number are ready."
           : status === "Rejected"
-          ? "Application did not pass review."
-          : "Final approval and PDF issuance pending.",
+            ? "Application did not pass review."
+            : "Final approval and PDF issuance pending.",
       done: status === "Approved" || status === "Rejected",
     },
   ];
