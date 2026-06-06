@@ -9,7 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import type { ApplicationFormConfig, ApplicationSlug } from "@/lib/applicationForms";
 
-export type ApplicationStatus = "Pending" | "In Review" | "Approved" | "Rejected";
+export type ApplicationStatus = "In Review" | "Approved" | "Rejected";
 
 export type ApplicationValues = Record<string, string>;
 
@@ -63,7 +63,7 @@ export async function createApplicationDocument({
     formSlug: config.slug,
     type: config.slug,
     title: config.title,
-    status: "Pending",
+    status: "In Review",
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     values,
@@ -83,13 +83,13 @@ export async function createApplicationDocument({
       },
       {
         title: "Dalam Semakan",
-        date: "Pending",
+        date: "In Review",
         desc: "Menunggu pengesahan daripada Penghulu",
         done: false,
       },
       {
         title: "Kelulusan Akhir",
-        date: "Pending",
+        date: "In Review",
         desc: "Pengeluaran sijil rasmi",
         done: false,
       },

@@ -14,7 +14,7 @@ interface Application {
   title: string;
   date: string;
   meta: string;
-  status: "Pending" | "In Review" | "Approved" | "Action Required" | "Rejected" | "Draft";
+  status: "In Review" | "Approved" | "Action Required" | "Rejected" | "Draft";
   statusColor: string;
   statusBg: string;
   statusDot: string;
@@ -175,7 +175,6 @@ export default function ReviewStatusPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option>All Statuses</option>
-              <option>Pending</option>
               <option>In Review</option>
               <option>Approved</option>
               <option>Rejected</option>
@@ -562,13 +561,13 @@ function buildTimeline(status: Application["status"], submittedAt: string, appro
     },
     {
       title: "Under Review",
-      date: status === "Pending" ? "Pending" : submittedAt,
+      date: submittedAt,
       desc: "Awaiting clerk and Penghulu validation.",
-      done: status !== "Pending",
+      done: true,
     },
     {
       title: status === "Rejected" ? "Rejected" : "Approved & Issued",
-      date: status === "Approved" ? approvedAt : status === "Rejected" ? "Completed" : "Pending",
+      date: status === "Approved" ? approvedAt : status === "Rejected" ? "Completed" : "In Review",
       desc:
         status === "Approved"
           ? "Digital certificate and serial number are ready."
@@ -586,7 +585,7 @@ function mapStatus(value: unknown): Application["status"] {
   if (status === "rejected") return "Rejected";
   if (status === "in review") return "In Review";
   if (status === "action required") return "Action Required";
-  return "Pending";
+  return "In Review";
 }
 
 function statusStyle(status: Application["status"]) {
@@ -624,7 +623,7 @@ function statusStyle(status: Application["status"]) {
 function formatFirestoreDate(value: unknown) {
   const date = toDate(value);
   if (!date) {
-    return "Pending";
+    return "In Review";
   }
   return new Intl.DateTimeFormat("en-MY", {
     day: "2-digit",

@@ -101,7 +101,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           id: submittedApplication.applicationId,
           referenceNumber: submittedApplication.referenceNumber,
           type: config.slug,
-          status: "Pending",
+          status: "In Review",
           values,
           submittedAt: new Date().toISOString(),
         })
@@ -145,7 +145,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
                 Status Awal
               </p>
-              <p className="mt-1 font-bold text-primary">Pending</p>
+              <p className="mt-1 font-bold text-primary">In Review</p>
             </div>
             <div className="border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">

@@ -49,7 +49,7 @@ export default function DashboardPage() {
               type: data.formSlug || data.type,
               title: data.formType || data.title || "Permohonan Penghulu",
               submittedAt: formatFirestoreDate(data.submittedAt),
-              status: data.status || "Pending",
+              status: data.status || "In Review",
             });
           });
           // Sort client-side descending by submittedAt
@@ -187,6 +187,7 @@ export default function DashboardPage() {
                 const isApproved = app.status === "Approved";
                 const isDraft = app.status === "Draft";
                 const isActionRequired = app.status === "Action Required";
+                const isRejected = app.status === "Rejected";
 
                 // Icon and colors mapping
                 let iconName = "description";
@@ -217,6 +218,9 @@ export default function DashboardPage() {
                 } else if (isActionRequired) {
                   statusText = "Action Required";
                   statusClass = "bg-error-container text-on-error-container";
+                } else if (isRejected) {
+                  statusText = "Rejected";
+                  statusClass = "bg-red-100 text-red-800";
                 }
 
                 const formattedDate = app.submittedAt;
