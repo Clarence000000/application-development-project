@@ -183,7 +183,7 @@ export default function PortalLayout({
                   className={`flex items-center gap-3 px-4 py-2.5 transition-all text-sm font-semibold rounded-lg ${
                     isActive
                       ? "bg-gray-100 dark:bg-gray-800 text-[#002D62] dark:text-white border-l-4 border-[#002D62]"
-                      : "text-gray-500 dark:text-gray-400 hover:text-[#002D62] hover:bg-gray-50 dark:hover:bg-gray-800"
+                      : "text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] hover:bg-gray-50 dark:hover:bg-gray-800" // Fixed dark text when hovering
                   }`}
                 >
                   <span
@@ -206,7 +206,7 @@ export default function PortalLayout({
             </button>
           </div>
           <div className="px-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-            <a className="flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#002D62] transition-all text-sm font-semibold" href="#">
+            <a className="flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] transition-all text-sm font-semibold" href="#">
               <span className="material-symbols-outlined text-xl">help</span>
               <span>Help</span>
             </a>

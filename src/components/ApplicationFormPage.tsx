@@ -3,8 +3,9 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { createApplicationDocument } from "@/lib/applications";
 import type { ApplicationFormConfig } from "@/lib/applicationForms";
-import { auth, db } from "@/lib/firebase";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -26,6 +27,8 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
   const [errors, setErrors] = useState<FormErrors>({});
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedReferenceNumber, setSubmittedReferenceNumber] = useState("");
 
   function updateValue(name: string, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -76,37 +79,42 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       return;
     }
 
-    const appId = `APP-${Date.now()}`;
-    const submittedAt = new Date().toISOString();
-    const timeline = [
-      { title: "Permohonan Draf", date: new Date().toLocaleDateString("ms-MY"), desc: "Pemohon mula mengisi borang", done: true },
-      { title: "Permohonan Dihantar", date: new Date().toLocaleDateString("ms-MY"), desc: "Permohonan berjaya dihantar ke Pejabat Penghulu", done: true },
-      { title: "Dalam Semakan", date: "Pending", desc: "Menunggu pengesahan daripada Penghulu", done: false },
-      { title: "Kelulusan Akhir", date: "Pending", desc: "Pengeluaran sijil rasmi", done: false }
-    ];
-
-    const appData = {
-      id: appId,
-      userId: auth.currentUser?.uid || "anonymous",
-      type: config.slug,
-      title: config.title,
-      status: "Pending",
-      values,
-      submittedAt,
-      meta: "Pejabat Penghulu Mukim Ayer Hitam",
-      timeline
-    };
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setErrors({
+        form: "Sila log masuk semula sebelum menghantar permohonan.",
+      });
+      return;
+    }
 
     try {
-      const { collection, addDoc } = await import("firebase/firestore");
-      await addDoc(collection(db, "applications"), appData);
-      window.localStorage.setItem("latestApplication", JSON.stringify(appData));
+      setIsSubmitting(true);
+      const submittedApplication = await createApplicationDocument({
+        uid: currentUser.uid,
+        config,
+        values,
+      });
+
+      window.localStorage.setItem(
+        "latestApplication",
+        JSON.stringify({
+          id: submittedApplication.applicationId,
+          referenceNumber: submittedApplication.referenceNumber,
+          type: config.slug,
+          status: "In Review",
+          values,
+          submittedAt: new Date().toISOString(),
+        })
+      );
+      setSubmittedReferenceNumber(submittedApplication.referenceNumber);
       setShowSuccess(true);
-    } catch (err) {
-      console.error("Failed to save application to Firestore: ", err);
-      // Fallback
-      window.localStorage.setItem("latestApplication", JSON.stringify(appData));
-      setShowSuccess(true);
+    } catch (error) {
+      console.error("Failed to submit application", error);
+      setErrors({
+        form: "Permohonan gagal dihantar. Sila cuba lagi.",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -137,7 +145,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
                 Status Awal
               </p>
-              <p className="mt-1 font-bold text-primary">Pending</p>
+              <p className="mt-1 font-bold text-primary">In Review</p>
             </div>
             <div className="border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
@@ -159,7 +167,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
         <div className="border-l-4 border-error bg-error-container px-4 py-3 text-on-error-container">
           <p className="text-sm font-bold">Sila semak maklumat permohonan.</p>
           <p className="mt-1 text-xs">
-            Lengkapkan medan yang bertanda sebelum menghantar permohonan.
+            {errors.form || "Lengkapkan medan yang bertanda sebelum menghantar permohonan."}
           </p>
         </div>
       )}
@@ -266,9 +274,10 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-container"
               >
-                Hantar Permohonan
+                {isSubmitting ? "Menghantar..." : "Hantar Permohonan"}
               </button>
             </div>
           </section>
@@ -317,6 +326,11 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
               Maklumat permohonan telah direkodkan. Sila semak status permohonan untuk
               makluman seterusnya.
             </p>
+            {submittedReferenceNumber && (
+              <p className="mt-3 text-xs font-bold text-primary">
+                No. Rujukan: {submittedReferenceNumber}
+              </p>
+            )}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
