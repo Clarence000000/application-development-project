@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { createApplicationDocument } from "@/lib/applications";
 import type { ApplicationFormConfig } from "@/lib/applicationForms";
+import { triggerEmailNotification } from "@/lib/notifications";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -94,6 +95,24 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
         config,
         values,
       });
+
+      if (currentUser.email) {
+        triggerEmailNotification({
+          userId: currentUser.uid,
+          recipientEmail: currentUser.email,
+          recipientName: values.name,
+          applicationId: submittedApplication.applicationId,
+          referenceNumber: submittedApplication.referenceNumber,
+          applicationTitle: config.title,
+          eventType: "application_submitted",
+          status: "In Review",
+          actionUrl: `/review-status?focus=${encodeURIComponent(
+            submittedApplication.referenceNumber,
+          )}`,
+        }).catch((error) => {
+          console.error("Failed to send submission notification", error);
+        });
+      }
 
       window.localStorage.setItem(
         "latestApplication",
