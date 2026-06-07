@@ -16,12 +16,14 @@ import type {
 
 export const runtime = "nodejs";
 
-type DeliveryStatus = "sent" | "preview" | "skipped" | "failed";
+type DeliveryStatus = "sent" | "skipped" | "failed";
 
 const defaultPreferences: NotificationPreferences = {
   emailEnabled: true,
+  smsEnabled: false,
   applicationSubmitted: true,
   statusUpdates: true,
+  documentRequests: true,
 };
 
 export async function POST(request: NextRequest) {
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const preferences = await getPreferences(payload.userId);
+  const preferences = await getPreferences(payload.uid);
   const emailAllowed = isEmailAllowed(preferences, payload.eventType);
   const copy = buildNotificationCopy(payload, request.nextUrl.origin);
 
@@ -63,14 +65,48 @@ export async function POST(request: NextRequest) {
     await createHistoryRecord(payload, copy, "failed");
 
     return NextResponse.json(
-      { error: "Email notification could not be sent." },
+      { error: getSmtpErrorMessage(error) },
       { status: 502 },
     );
   }
 }
 
-async function getPreferences(userId: string) {
-  const preferencesSnap = await getDoc(doc(db, "notificationPreferences", userId));
+function getSmtpErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Email notification could not be sent.";
+  }
+
+  const maybeSmtpError = error as Error & {
+    code?: string;
+    command?: string;
+    responseCode?: number;
+  };
+
+  if (maybeSmtpError.code === "EAUTH" || maybeSmtpError.responseCode === 535) {
+    return "SMTP authentication failed. For Gmail, use a Google App Password, not your normal Gmail password.";
+  }
+
+  if (maybeSmtpError.code === "ECONNECTION") {
+    return "SMTP connection failed. Check NODEMAILER_SMTP_HOST, NODEMAILER_SMTP_PORT, and network access.";
+  }
+
+  if (maybeSmtpError.code === "ETIMEDOUT") {
+    return "SMTP connection timed out. Check the SMTP host, port, and network connection.";
+  }
+
+  if (maybeSmtpError.command === "RCPT TO") {
+    return "SMTP rejected the recipient address. Check the applicant email address.";
+  }
+
+  if (maybeSmtpError.command === "MAIL FROM") {
+    return "SMTP rejected the sender address. Set NODEMAILER_SMTP_FROM to the same email as NODEMAILER_SMTP_USER.";
+  }
+
+  return "Email notification could not be sent. Check the SMTP configuration and sender account settings.";
+}
+
+async function getPreferences(uid: string) {
+  const preferencesSnap = await getDoc(doc(db, "notificationPreferences", uid));
 
   if (!preferencesSnap.exists()) {
     return defaultPreferences;
@@ -91,6 +127,14 @@ async function getPreferences(userId: string) {
       typeof data.statusUpdates === "boolean"
         ? data.statusUpdates
         : defaultPreferences.statusUpdates,
+    smsEnabled:
+      typeof data.smsEnabled === "boolean"
+        ? data.smsEnabled
+        : defaultPreferences.smsEnabled,
+    documentRequests:
+      typeof data.documentRequests === "boolean"
+        ? data.documentRequests
+        : defaultPreferences.documentRequests,
   };
 }
 
@@ -104,6 +148,10 @@ function isEmailAllowed(
 
   if (eventType === "application_submitted") {
     return preferences.applicationSubmitted;
+  }
+
+  if (eventType === "document_requested") {
+    return preferences.documentRequests;
   }
 
   return preferences.statusUpdates;
@@ -148,7 +196,7 @@ async function createHistoryRecord(
   deliveryStatus: DeliveryStatus,
 ) {
   await addDoc(collection(db, "notifications"), {
-    userId: payload.userId,
+    uid: payload.uid,
     title: copy.title,
     message: copy.summary,
     applicationId: payload.applicationId || null,
@@ -158,18 +206,18 @@ async function createHistoryRecord(
     deliveryChannel: "email",
     deliveryStatus,
     read: false,
-    emailTo: payload.recipientEmail,
+    recipient: payload.recipientEmail,
     createdAt: serverTimestamp(),
   });
 }
 
 function normalizePayload(data: Record<string, unknown>): EmailNotificationPayload {
-  const userId = readString(data.userId);
+  const uid = readString(data.uid) || readString(data.userId);
   const recipientEmail = readString(data.recipientEmail);
   const applicationTitle = readString(data.applicationTitle);
   const eventType = readEventType(data.eventType);
 
-  if (!userId) {
+  if (!uid) {
     throw new Error("User ID is required.");
   }
 
@@ -182,7 +230,7 @@ function normalizePayload(data: Record<string, unknown>): EmailNotificationPaylo
   }
 
   return {
-    userId,
+    uid,
     recipientEmail,
     applicationTitle,
     eventType,
@@ -211,7 +259,7 @@ function buildNotificationCopy(
 
   if (payload.eventType === "application_submitted") {
     const title = "Application Submitted";
-    const summary = `Your ${payload.applicationTitle} application (${reference}) has been received and is now in review.`;
+    const summary = `We have received your ${payload.applicationTitle} application (${reference}) and is now in review.`;
 
     return {
       title,
@@ -255,7 +303,7 @@ function buildNotificationCopy(
   const title = `Application ${status}`;
   const summary =
     payload.message ||
-    `Your ${payload.applicationTitle} application (${reference}) status has been updated to ${status}.`;
+    `Your ${payload.applicationTitle} application (${reference}) has been ${status}.`;
 
   return {
     title,

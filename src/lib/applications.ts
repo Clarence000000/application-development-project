@@ -121,5 +121,5 @@ export function generateReferenceNumber(date = new Date()) {
     .join("")
     .toUpperCase();
 
-  return `GC-${year}-${randomCode}`;
+  return `APP-${year}-${randomCode}`;
 }

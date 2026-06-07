@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   defaultNotificationPreferences,
+  deleteNotificationHistory,
   formatNotificationDate,
   getNotificationHistory,
   getNotificationPreferences,
@@ -100,6 +101,19 @@ export default function NotificationsPage() {
     }
   }
 
+  async function handleClearAll() {
+    if (history.length === 0) return;
+
+    try {
+      await deleteNotificationHistory(history);
+      setHistory([]);
+      showToast("Notification history cleared.");
+    } catch (error) {
+      console.error("Failed to clear notification history", error);
+      showToast("Notification history could not be cleared.");
+    }
+  }
+
   function showToast(message: string) {
     setToastMessage(message);
     window.setTimeout(() => setToastMessage(""), 2600);
@@ -109,9 +123,6 @@ export default function NotificationsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 border-b border-outline-variant pb-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-secondary">
-            Notification Subsystem
-          </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary md:text-3xl">
             Email Notifications
           </h1>
@@ -148,15 +159,22 @@ export default function NotificationsPage() {
           <div className="mt-4 space-y-3">
             <PreferenceToggle
               checked={preferences.emailEnabled}
-              description="Master switch for all Nodemailer email alerts."
+              description="Master switch for all email alerts."
               icon="mail"
               label="Email alerts"
               onChange={(checked) => updatePreference("emailEnabled", checked)}
             />
             <PreferenceToggle
+              checked={preferences.smsEnabled}
+              description="Reserved for SMS alerts when the SMS channel is enabled."
+              icon="sms"
+              label="SMS alerts"
+              onChange={(checked) => updatePreference("smsEnabled", checked)}
+            />
+            <PreferenceToggle
               checked={preferences.applicationSubmitted}
               description="Receive an email when a new application is recorded."
-              disabled={!preferences.emailEnabled}
+              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
               icon="outgoing_mail"
               label="Application submitted"
               onChange={(checked) =>
@@ -166,15 +184,25 @@ export default function NotificationsPage() {
             <PreferenceToggle
               checked={preferences.statusUpdates}
               description="Receive updates for approval, rejection, or document requests."
-              disabled={!preferences.emailEnabled}
+              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
               icon="published_with_changes"
               label="Status updates"
               onChange={(checked) => updatePreference("statusUpdates", checked)}
             />
+            <PreferenceToggle
+              checked={preferences.documentRequests}
+              description="Receive alerts when staff request additional documents."
+              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
+              icon="upload_file"
+              label="Document requests"
+              onChange={(checked) =>
+                updatePreference("documentRequests", checked)
+              }
+            />
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-lg border border-outline-variant bg-white">
+        <section className="flex max-h-[calc(100vh-220px)] min-h-[520px] flex-col overflow-hidden rounded-lg border border-outline-variant bg-white">
           <div className="flex flex-col gap-3 border-b border-outline-variant px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-bold text-primary">
@@ -184,44 +212,58 @@ export default function NotificationsPage() {
                 {history.length} email notification record(s)
               </p>
             </div>
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={unreadCount === 0}
-              onClick={handleMarkAllRead}
-            >
-              <span className="material-symbols-outlined text-[16px]">
-                done_all
-              </span>
-              Mark all read
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-error bg-white px-3 py-2 text-xs font-bold text-error transition hover:bg-error-container/30 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={history.length === 0}
+                onClick={handleClearAll}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  delete_sweep
+                </span>
+                Clear all
+              </button>
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={unreadCount === 0}
+                onClick={handleMarkAllRead}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  done_all
+                </span>
+                Mark all read
+              </button>
+            </div>
           </div>
 
-          {isLoading ? (
-            <div className="p-10 text-center text-sm font-medium text-secondary">
-              Loading notification history...
-            </div>
-          ) : history.length > 0 ? (
-            <div className="divide-y divide-outline-variant">
-              {history.map((notification) => (
-                <NotificationHistoryRow
-                  key={notification.id}
-                  notification={notification}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="p-10 text-center">
-              <span className="material-symbols-outlined text-4xl text-outline">
-                notifications_off
-              </span>
-              <h3 className="mt-2 text-sm font-bold text-on-surface">
-                No notifications yet
-              </h3>
-              <p className="mt-1 text-xs text-on-surface-variant">
-                Email alerts will appear here after an application event is triggered.
-              </p>
-            </div>
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {isLoading ? (
+              <div className="p-10 text-center text-sm font-medium text-secondary">
+                Loading notification history...
+              </div>
+            ) : history.length > 0 ? (
+              <div className="divide-y divide-outline-variant">
+                {history.map((notification) => (
+                  <NotificationHistoryRow
+                    key={notification.id}
+                    notification={notification}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="p-10 text-center">
+                <span className="material-symbols-outlined text-4xl text-outline">
+                  notifications_off
+                </span>
+                <h3 className="mt-2 text-sm font-bold text-on-surface">
+                  No notifications yet
+                </h3>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Email alerts will appear here after an application event is triggered.
+                </p>
+              </div>
+            )}
+          </div>
         </section>
       </section>
 

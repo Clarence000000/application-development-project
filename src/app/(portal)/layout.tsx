@@ -105,7 +105,7 @@ export default function PortalLayout({
             >
               notifications
               {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[9px] font-bold leading-4 text-white">
+                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[10px] font-mono leading-4 text-white">
                   {unreadCount}
                 </span>
               )}

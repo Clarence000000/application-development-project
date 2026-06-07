@@ -2,6 +2,7 @@
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -21,12 +22,14 @@ export type NotificationEventType =
 
 export type NotificationPreferences = {
   emailEnabled: boolean;
+  smsEnabled: boolean;
   applicationSubmitted: boolean;
   statusUpdates: boolean;
+  documentRequests: boolean;
 };
 
 export type EmailNotificationPayload = {
-  userId: string;
+  uid: string;
   recipientEmail: string;
   recipientName?: string;
   applicationId?: string;
@@ -40,27 +43,30 @@ export type EmailNotificationPayload = {
 
 export type NotificationHistoryItem = {
   id: string;
-  userId: string;
+  uid: string;
   title: string;
   message: string;
   applicationId?: string;
   referenceNumber?: string;
   applicationTitle?: string;
   eventType: NotificationEventType;
-  deliveryChannel: "email";
-  deliveryStatus: "sent" | "preview" | "skipped" | "failed";
+  deliveryChannel: "email" | "sms";
+  deliveryStatus: "sent" | "skipped" | "failed";
+  recipient?: string;
   read: boolean;
   createdAt: Date | null;
 };
 
 export const defaultNotificationPreferences: NotificationPreferences = {
   emailEnabled: true,
+  smsEnabled: false,
   applicationSubmitted: true,
   statusUpdates: true,
+  documentRequests: true,
 };
 
-export async function getNotificationPreferences(userId: string) {
-  const preferencesRef = doc(db, "notificationPreferences", userId);
+export async function getNotificationPreferences(uid: string) {
+  const preferencesRef = doc(db, "notificationPreferences", uid);
   const preferencesSnap = await getDoc(preferencesRef);
 
   if (!preferencesSnap.exists()) {
@@ -71,12 +77,13 @@ export async function getNotificationPreferences(userId: string) {
 }
 
 export async function saveNotificationPreferences(
-  userId: string,
+  uid: string,
   preferences: NotificationPreferences,
 ) {
   await setDoc(
-    doc(db, "notificationPreferences", userId),
+    doc(db, "notificationPreferences", uid),
     {
+      uid,
       ...preferences,
       updatedAt: serverTimestamp(),
     },
@@ -106,12 +113,21 @@ export async function triggerEmailNotification(
   }>;
 }
 
-export async function getNotificationHistory(userId: string) {
-  const historySnap = await getDocs(
-    query(collection(db, "notifications"), where("userId", "==", userId)),
+export async function getNotificationHistory(uid: string) {
+  const currentSchemaSnap = await getDocs(
+    query(collection(db, "notifications"), where("uid", "==", uid)),
+  );
+  const legacySchemaSnap = await getDocs(
+    query(collection(db, "notifications"), where("userId", "==", uid)),
+  );
+  const snapshotsById = new Map(
+    [...currentSchemaSnap.docs, ...legacySchemaSnap.docs].map((snapshot) => [
+      snapshot.id,
+      snapshot,
+    ]),
   );
 
-  return historySnap.docs
+  return Array.from(snapshotsById.values())
     .map((snapshot) => mapNotificationHistoryItem(snapshot.id, snapshot.data()))
     .sort((left, right) => {
       const leftTime = left.createdAt?.getTime() || 0;
@@ -125,6 +141,12 @@ export async function markNotificationsAsRead(items: NotificationHistoryItem[]) 
     items
       .filter((item) => !item.read)
       .map((item) => updateDoc(doc(db, "notifications", item.id), { read: true })),
+  );
+}
+
+export async function deleteNotificationHistory(items: NotificationHistoryItem[]) {
+  await Promise.all(
+    items.map((item) => deleteDoc(doc(db, "notifications", item.id))),
   );
 }
 
@@ -148,6 +170,10 @@ function normalizePreferences(data: Record<string, unknown>) {
       typeof data.emailEnabled === "boolean"
         ? data.emailEnabled
         : defaultNotificationPreferences.emailEnabled,
+    smsEnabled:
+      typeof data.smsEnabled === "boolean"
+        ? data.smsEnabled
+        : defaultNotificationPreferences.smsEnabled,
     applicationSubmitted:
       typeof data.applicationSubmitted === "boolean"
         ? data.applicationSubmitted
@@ -156,6 +182,10 @@ function normalizePreferences(data: Record<string, unknown>) {
       typeof data.statusUpdates === "boolean"
         ? data.statusUpdates
         : defaultNotificationPreferences.statusUpdates,
+    documentRequests:
+      typeof data.documentRequests === "boolean"
+        ? data.documentRequests
+        : defaultNotificationPreferences.documentRequests,
   };
 }
 
@@ -165,15 +195,16 @@ function mapNotificationHistoryItem(
 ): NotificationHistoryItem {
   return {
     id,
-    userId: readString(data.userId),
+    uid: readString(data.uid) || readString(data.userId),
     title: readString(data.title) || "Notification",
     message: readString(data.message),
     applicationId: readString(data.applicationId) || undefined,
     referenceNumber: readString(data.referenceNumber) || undefined,
     applicationTitle: readString(data.applicationTitle) || undefined,
     eventType: readEventType(data.eventType),
-    deliveryChannel: "email",
+    deliveryChannel: readDeliveryChannel(data.deliveryChannel),
     deliveryStatus: readDeliveryStatus(data.deliveryStatus),
+    recipient: readString(data.recipient) || readString(data.emailTo) || undefined,
     read: typeof data.read === "boolean" ? data.read : false,
     createdAt: toDate(data.createdAt),
   };
@@ -191,13 +222,16 @@ function readEventType(value: unknown): NotificationEventType {
   return "status_updated";
 }
 
+function readDeliveryChannel(value: unknown): NotificationHistoryItem["deliveryChannel"] {
+  if (value === "email" || value === "sms") {
+    return value;
+  }
+
+  return "email";
+}
+
 function readDeliveryStatus(value: unknown): NotificationHistoryItem["deliveryStatus"] {
-  if (
-    value === "sent" ||
-    value === "preview" ||
-    value === "skipped" ||
-    value === "failed"
-  ) {
+  if (value === "sent" || value === "skipped" || value === "failed") {
     return value;
   }
 

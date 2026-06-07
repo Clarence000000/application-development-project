@@ -23,7 +23,7 @@ type ApprovalStatus =
 type ApplicationRecord = {
   documentId: string;
   id: string;
-  userId: string;
+  uid: string;
   applicantName: string;
   idNumber: string;
   formName: string;
@@ -92,9 +92,9 @@ export default function ApprovalReviewPage() {
           const mappedApplications = await Promise.all(
             snapshot.docs.map(async (applicationSnapshot) => {
               const application = applicationSnapshot.data();
-              const userId = readString(application.uid, application.userId);
-              const userSnapshot = userId
-                ? await getDoc(doc(db, "users", userId))
+              const uid = readString(application.uid, application.userId);
+              const userSnapshot = uid
+                ? await getDoc(doc(db, "users", uid))
                 : null;
               const user = userSnapshot?.exists() ? userSnapshot.data() : {};
 
@@ -220,7 +220,7 @@ export default function ApprovalReviewPage() {
       });
       try {
         await triggerEmailNotification({
-          userId: selectedApplication.userId,
+          uid: selectedApplication.uid,
           recipientEmail: selectedApplication.emailAddress,
           recipientName: selectedApplication.applicantName,
           applicationId: selectedApplication.documentId,
@@ -656,7 +656,7 @@ async function triggerDecisionEmail(
   }
 
   await triggerEmailNotification({
-    userId: application.userId,
+    uid: application.uid,
     recipientEmail: application.emailAddress,
     recipientName: application.applicantName,
     applicationId: application.documentId,
@@ -739,7 +739,7 @@ function mapApplicationRecord(
     id:
       readString(application.referenceNumber, application.applicationId) ||
       documentId,
-    userId: readString(application.uid, application.userId),
+    uid: readString(application.uid, application.userId),
     applicantName: readString(values.name, user.name) || "Unknown Applicant",
     idNumber: readString(values.idNumber, user.icNumber) || "-",
     formName:

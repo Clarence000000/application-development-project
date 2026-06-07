@@ -98,7 +98,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
 
       if (currentUser.email) {
         triggerEmailNotification({
-          userId: currentUser.uid,
+          uid: currentUser.uid,
           recipientEmail: currentUser.email,
           recipientName: values.name,
           applicationId: submittedApplication.applicationId,
