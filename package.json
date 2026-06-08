@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "firebase:frameworks": "firebase experiments:enable webframeworks",
+    "firebase:preview": "firebase hosting:channel:deploy sprint4-demo --expires 7d",
+    "firebase:deploy": "firebase deploy --only hosting"
   },
   "dependencies": {
     "firebase": "^12.13.0",
@@ -22,6 +25,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "firebase-tools": "^15.19.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

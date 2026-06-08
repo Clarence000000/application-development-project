@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
@@ -79,6 +79,20 @@ const mapCategory = (type: string) => {
 };
 
 export default function ReviewStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-sm font-medium text-secondary">
+          Sila tunggu, memuatkan maklumat permohonan...
+        </div>
+      }
+    >
+      <ReviewStatusContent />
+    </Suspense>
+  );
+}
+
+function ReviewStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusedId = searchParams.get("focus");
