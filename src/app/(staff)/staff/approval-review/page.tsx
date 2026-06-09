@@ -34,7 +34,7 @@ const initialApplications: ApplicationRecord[] = [
     status: "Pending Review",
     purpose: "Application for school assistance documentation.",
     address: "No. 14, Jalan Mawar 3, Kampung Seri Aman, 86100 Ayer Hitam, Johor",
-    phoneNumber: "012-345 6789",
+    phoneNumber: "019-989 3697",
     supportingNotes: "Applicant declared current residence as matching the service area.",
     timeline: [
       { title: "Application Submitted", date: "02 Jun 2026", done: true },
@@ -168,7 +168,7 @@ export default function ApprovalReviewPage() {
     [assignedApplications],
   );
 
-  const updateStatus = (nextStatus: ApprovalStatus) => {
+  const updateStatus = async (nextStatus: ApprovalStatus) => {
     if (!selectedApplication) return;
 
     setApplications((current) =>
@@ -179,27 +179,51 @@ export default function ApprovalReviewPage() {
               status: nextStatus,
               supportingNotes: remarks.trim() || application.supportingNotes,
               timeline: application.timeline.map((step) => {
-                if (
-                  nextStatus === "Staff Vetted" && step.title === "Staff Vetting"
-                ) {
+                if (nextStatus === "Staff Vetted" && step.title === "Staff Vetting") {
                   return { ...step, date: "Today", done: true };
                 }
-
                 if (
                   (nextStatus === "Approved" || nextStatus === "Rejected") &&
                   (step.title === "Staff Vetting" || step.title === "Penghulu Decision")
                 ) {
                   return { ...step, date: step.done ? step.date : "Today", done: true };
                 }
-
                 return step;
               }),
             }
           : application,
       ),
     );
+
     setToastMessage(`${selectedApplication.id} updated to ${nextStatus}.`);
     setRemarks("");
+
+    if (nextStatus === "Approved" || nextStatus === "Rejected") {
+      try {
+        const response = await fetch("/api/twilio", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: selectedApplication.id,
+            applicantName: selectedApplication.applicantName,
+            formName: selectedApplication.formName,
+            phoneNumber: selectedApplication.phoneNumber,
+            status: nextStatus,
+            uid: "USR-" + selectedApplication.idNumber.split("-")[0],
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          console.warn("SMS notification logged with failures or sandbox constraints checked.");
+        }
+      } catch (smsTriggerError) {
+        console.error("Failed to connect to the SMS backend service handler:", smsTriggerError);
+      }
+    }
+
     window.setTimeout(() => setToastMessage(""), 2800);
   };
 
