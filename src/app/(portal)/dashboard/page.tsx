@@ -33,14 +33,17 @@ export default function DashboardPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          // 1. Fetch user's profile details
+                    // 1. Fetch user's profile details
           const userRef = doc(db, "users", user.uid);
           const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            if (data?.name) {
-              setUserName(data.name);
-            }
+          
+          if (userSnap.exists() && userSnap.data()?.name != "Not Scanned") {
+            // User scanned IC and has a name
+            setUserName(userSnap.data().name);
+          } else {
+            // User didn't scan IC or has no name, use email without domain
+            const emailName = user.email ? user.email.split('@')[0] : "Pemohon";
+            setUserName(emailName);
           }
 
           // 2. Fetch user's applications
@@ -257,7 +260,7 @@ export default function DashboardPage() {
                     "bg-surface-container-highest text-on-surface-variant";
                 } else if (isActionRequired) {
                   statusText = "Action Required";
-                  statusClass = "bg-error-container text-on-error-container";
+                  statusClass = "bg-yellow-100 text-yellow-800";
                 } else if (isRejected) {
                   statusText = "Rejected";
                   statusClass = "bg-red-100 text-red-800";
