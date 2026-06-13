@@ -7,7 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   formatNotificationDate,
-  getNotificationHistory,
+  subscribeNotificationHistory,
   type NotificationHistoryItem,
 } from "@/lib/notifications";
 
@@ -26,22 +26,29 @@ export default function PortalLayout({
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeNotifications: (() => void) | null = null;
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
+        unsubscribeNotifications?.();
+        unsubscribeNotifications = null;
         setNotifications([]);
         return;
       }
 
-      try {
-        const history = await getNotificationHistory(user.uid);
-        setNotifications(history.slice(0, 4));
-      } catch (error) {
-        console.error("Failed to load notification dropdown", error);
-      }
+      unsubscribeNotifications?.();
+      unsubscribeNotifications = subscribeNotificationHistory(
+        user.uid,
+        (history) => setNotifications(history.slice(0, 4)),
+        (error) => console.error("Notification dropdown listener failed", error),
+      );
     });
 
-    return () => unsubscribe();
-  }, [pathname]);
+    return () => {
+      unsubscribeNotifications?.();
+      unsubscribe();
+    };
+  }, []);
 
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,

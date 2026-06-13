@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { createApplicationDocument } from "@/lib/applications";
 import type { ApplicationFormConfig } from "@/lib/applicationForms";
-import { triggerEmailNotification } from "@/lib/notifications";
+import {
+  createInAppNotification,
+  triggerEmailNotification,
+} from "@/lib/notifications";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -96,11 +99,22 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
         values,
       });
 
+      const notificationId = await createInAppNotification({
+        uid: currentUser.uid,
+        title: "Application Submitted",
+        message: `We have received your ${config.title} application (${submittedApplication.referenceNumber}) and it is now in review.`,
+        applicationId: submittedApplication.applicationId,
+        referenceNumber: submittedApplication.referenceNumber,
+        applicationTitle: config.title,
+        eventType: "application_submitted",
+      });
+
       if (currentUser.email) {
         triggerEmailNotification({
           uid: currentUser.uid,
           recipientEmail: currentUser.email,
           recipientName: values.name,
+          notificationId,
           applicationId: submittedApplication.applicationId,
           referenceNumber: submittedApplication.referenceNumber,
           applicationTitle: config.title,

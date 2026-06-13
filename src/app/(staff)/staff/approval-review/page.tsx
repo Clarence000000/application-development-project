@@ -11,7 +11,10 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { triggerEmailNotification } from "@/lib/notifications";
+import {
+  createInAppNotification,
+  triggerEmailNotification,
+} from "@/lib/notifications";
 
 type ApprovalStatus =
   | "Pending Review"
@@ -185,9 +188,25 @@ export default function ApprovalReviewPage() {
         doc(db, "applications", selectedApplication.documentId),
         buildApplicationStatusUpdate(nextStatus, note),
       );
+      const notificationCopy = buildDecisionNotificationCopy(
+        selectedApplication,
+        nextStatus,
+        note,
+      );
+      const notificationId = notificationCopy
+        ? await createInAppNotification({
+            uid: selectedApplication.uid,
+            title: notificationCopy.title,
+            message: notificationCopy.message,
+            applicationId: selectedApplication.documentId,
+            referenceNumber: selectedApplication.id,
+            applicationTitle: selectedApplication.formName,
+            eventType: "status_updated",
+          })
+        : null;
       const notificationResults = await Promise.allSettled([
-        triggerDecisionEmail(selectedApplication, nextStatus, note),
-        triggerDecisionSms(selectedApplication, nextStatus),
+        triggerDecisionEmail(selectedApplication, nextStatus, note, notificationId),
+        triggerDecisionSms(selectedApplication, nextStatus, notificationId),
       ]);
       const failedNotifications = notificationResults.filter(
         (result) => result.status === "rejected",
@@ -213,7 +232,7 @@ export default function ApprovalReviewPage() {
 
     const note =
       remarks.trim() ||
-      "Missing document request recorded. Applicant will be notified to upload the required document.";
+      `Additional documents are required for your ${selectedApplication.formName} application (${selectedApplication.id}). Please review the request and upload the required document.`;
 
     try {
       setIsUpdating(true);
@@ -225,11 +244,21 @@ export default function ApprovalReviewPage() {
         actionRequiredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      const notificationId = await createInAppNotification({
+        uid: selectedApplication.uid,
+        title: "Action Required",
+        message: note,
+        applicationId: selectedApplication.documentId,
+        referenceNumber: selectedApplication.id,
+        applicationTitle: selectedApplication.formName,
+        eventType: "document_requested",
+      });
       try {
         await triggerEmailNotification({
           uid: selectedApplication.uid,
           recipientEmail: selectedApplication.emailAddress,
           recipientName: selectedApplication.applicantName,
+          notificationId,
           applicationId: selectedApplication.documentId,
           referenceNumber: selectedApplication.id,
           applicationTitle: selectedApplication.formName,
@@ -653,6 +682,7 @@ async function triggerDecisionEmail(
   application: ApplicationRecord,
   nextStatus: ApprovalStatus,
   remarks: string,
+  notificationId: string | null,
 ) {
   if (
     nextStatus === "Staff Vetted" ||
@@ -666,14 +696,13 @@ async function triggerDecisionEmail(
     uid: application.uid,
     recipientEmail: application.emailAddress,
     recipientName: application.applicantName,
+    notificationId: notificationId || undefined,
     applicationId: application.documentId,
     referenceNumber: application.id,
     applicationTitle: application.formName,
     eventType: "status_updated",
     status: nextStatus,
-    message:
-      remarks ||
-      `Your ${application.formName} application (${application.id}) has been updated to ${nextStatus}.`,
+    message: remarks || buildDecisionMessage(application, nextStatus),
     actionUrl: `/review-status?focus=${encodeURIComponent(application.id)}`,
   });
 }
@@ -681,6 +710,7 @@ async function triggerDecisionEmail(
 async function triggerDecisionSms(
   application: ApplicationRecord,
   nextStatus: ApprovalStatus,
+  notificationId: string | null,
 ) {
   if (nextStatus !== "Approved" && nextStatus !== "Rejected") {
     return;
@@ -703,6 +733,7 @@ async function triggerDecisionSms(
       phoneNumber,
       status: nextStatus,
       uid: application.uid,
+      notificationId,
     }),
   });
   const data = await response.json().catch(() => null);
@@ -710,6 +741,40 @@ async function triggerDecisionSms(
   if (!response.ok || !data?.success) {
     throw new Error(data?.error || "SMS notification failed.");
   }
+}
+
+function buildDecisionNotificationCopy(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+  remarks: string,
+) {
+  if (
+    nextStatus === "Staff Vetted" ||
+    nextStatus === "Pending Review" ||
+    nextStatus === "Action Required"
+  ) {
+    return null;
+  }
+
+  return {
+    title: `Application ${nextStatus}`,
+    message: remarks || buildDecisionMessage(application, nextStatus),
+  };
+}
+
+function buildDecisionMessage(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+) {
+  if (nextStatus === "Approved") {
+    return `Your ${application.formName} application (${application.id}) has been approved. You may view the latest status and download the approved document when it is available.`;
+  }
+
+  if (nextStatus === "Rejected") {
+    return `Your ${application.formName} application (${application.id}) has been rejected. Please review the reason provided by the Pejabat Penghulu.`;
+  }
+
+  return `Your ${application.formName} application (${application.id}) has a new update.`;
 }
 
 function buildApplicationStatusUpdate(

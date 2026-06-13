@@ -6,6 +6,7 @@ import {
   doc,
   getDoc,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type {
@@ -41,6 +42,14 @@ export async function POST(request: NextRequest) {
   const preferences = await getPreferences(payload.uid);
   const emailAllowed = isEmailAllowed(preferences, payload.eventType);
   const copy = buildNotificationCopy(payload, request.nextUrl.origin);
+
+  if (!emailAllowed) {
+    await updateEmailDeliveryStatus(payload, "disabled");
+    return NextResponse.json({
+      ok: true,
+      deliveryStatus: "disabled",
+    });
+  }
 
   try {
     const { transporter, deliveryStatus } = createTransporter();
@@ -190,6 +199,11 @@ async function createHistoryRecord(
   copy: ReturnType<typeof buildNotificationCopy>,
   deliveryStatus: DeliveryStatus,
 ) {
+  if (payload.notificationId) {
+    await updateEmailDeliveryStatus(payload, deliveryStatus);
+    return;
+  }
+
   await addDoc(collection(db, "notifications"), {
     uid: payload.uid,
     title: copy.title,
@@ -203,6 +217,21 @@ async function createHistoryRecord(
     read: false,
     recipient: payload.recipientEmail,
     createdAt: serverTimestamp(),
+  });
+}
+
+async function updateEmailDeliveryStatus(
+  payload: EmailNotificationPayload,
+  deliveryStatus: DeliveryStatus | "disabled",
+) {
+  if (!payload.notificationId) {
+    return;
+  }
+
+  await updateDoc(doc(db, "notifications", payload.notificationId), {
+    emailStatus: deliveryStatus,
+    emailRecipient: payload.recipientEmail,
+    updatedAt: serverTimestamp(),
   });
 }
 
@@ -230,6 +259,7 @@ function normalizePayload(data: Record<string, unknown>): EmailNotificationPaylo
     applicationTitle,
     eventType,
     recipientName: readString(data.recipientName) || undefined,
+    notificationId: readString(data.notificationId) || undefined,
     applicationId: readString(data.applicationId) || undefined,
     referenceNumber: readString(data.referenceNumber) || undefined,
     status: readString(data.status) || undefined,
@@ -296,9 +326,7 @@ function buildNotificationCopy(
 
   const status = payload.status || "Updated";
   const title = `Application ${status}`;
-  const summary =
-    payload.message ||
-    `Your ${payload.applicationTitle} application (${reference}) has been ${status}.`;
+  const summary = payload.message || buildStatusSummary(payload, reference);
 
   return {
     title,
@@ -314,6 +342,21 @@ function buildNotificationCopy(
       actionUrl,
     }),
   };
+}
+
+function buildStatusSummary(
+  payload: EmailNotificationPayload,
+  reference: string,
+) {
+  if (payload.status === "Approved") {
+    return `Your ${payload.applicationTitle} application (${reference}) has been approved. You may view the latest status and download the approved document when it is available.`;
+  }
+
+  if (payload.status === "Rejected") {
+    return `Your ${payload.applicationTitle} application (${reference}) has been rejected. Please review the reason provided by the Pejabat Penghulu.`;
+  }
+
+  return `Your ${payload.applicationTitle} application (${reference}) has a new update.`;
 }
 
 function emailTemplate({

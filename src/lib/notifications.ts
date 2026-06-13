@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
@@ -32,6 +34,7 @@ export type EmailNotificationPayload = {
   uid: string;
   recipientEmail: string;
   recipientName?: string;
+  notificationId?: string;
   applicationId?: string;
   referenceNumber?: string;
   applicationTitle: string;
@@ -50,11 +53,23 @@ export type NotificationHistoryItem = {
   referenceNumber?: string;
   applicationTitle?: string;
   eventType: NotificationEventType;
-  deliveryChannel: "email" | "sms";
-  deliveryStatus: "sent" | "failed";
+  deliveryChannel: "in_app" | "email" | "sms";
+  deliveryStatus: "sent" | "failed" | "disabled";
+  emailStatus?: "sent" | "failed" | "disabled";
+  smsStatus?: "sent" | "failed" | "disabled";
   recipient?: string;
   read: boolean;
   createdAt: Date | null;
+};
+
+export type InAppNotificationPayload = {
+  uid: string;
+  title: string;
+  message: string;
+  applicationId?: string;
+  referenceNumber?: string;
+  applicationTitle?: string;
+  eventType: NotificationEventType;
 };
 
 export const defaultNotificationPreferences: NotificationPreferences = {
@@ -109,8 +124,44 @@ export async function triggerEmailNotification(
 
   return response.json() as Promise<{
     ok: boolean;
-    deliveryStatus: NotificationHistoryItem["deliveryStatus"];
+    deliveryStatus: "sent" | "failed" | "disabled";
   }>;
+}
+
+export async function createInAppNotification(
+  payload: InAppNotificationPayload,
+) {
+  const notificationRef = await addDoc(collection(db, "notifications"), {
+    uid: payload.uid,
+    title: payload.title,
+    message: payload.message,
+    applicationId: payload.applicationId || null,
+    referenceNumber: payload.referenceNumber || null,
+    applicationTitle: payload.applicationTitle || null,
+    eventType: payload.eventType,
+    deliveryChannel: "in_app",
+    deliveryStatus: "sent",
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+
+  return notificationRef.id;
+}
+
+export async function updateNotificationChannelStatus(
+  notificationId: string,
+  channel: "email" | "sms",
+  status: "sent" | "failed" | "disabled",
+  recipient?: string,
+) {
+  const statusField = channel === "email" ? "emailStatus" : "smsStatus";
+  const recipientField = channel === "email" ? "emailRecipient" : "smsRecipient";
+
+  await updateDoc(doc(db, "notifications", notificationId), {
+    [statusField]: status,
+    [recipientField]: recipient || null,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function getNotificationHistory(uid: string) {
@@ -134,6 +185,35 @@ export async function getNotificationHistory(uid: string) {
       const rightTime = right.createdAt?.getTime() || 0;
       return rightTime - leftTime;
     });
+}
+
+export function subscribeNotificationHistory(
+  uid: string,
+  onChange: (items: NotificationHistoryItem[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const currentSchemaQuery = query(
+    collection(db, "notifications"),
+    where("uid", "==", uid),
+  );
+
+  return onSnapshot(
+    currentSchemaQuery,
+    (snapshot) => {
+      const items = snapshot.docs
+        .map((docSnapshot) =>
+          mapNotificationHistoryItem(docSnapshot.id, docSnapshot.data()),
+        )
+        .sort((left, right) => {
+          const leftTime = left.createdAt?.getTime() || 0;
+          const rightTime = right.createdAt?.getTime() || 0;
+          return rightTime - leftTime;
+        });
+
+      onChange(items);
+    },
+    onError,
+  );
 }
 
 export async function markNotificationsAsRead(items: NotificationHistoryItem[]) {
@@ -204,6 +284,8 @@ function mapNotificationHistoryItem(
     eventType: readEventType(data.eventType),
     deliveryChannel: readDeliveryChannel(data.deliveryChannel),
     deliveryStatus: readDeliveryStatus(data.deliveryStatus),
+    emailStatus: readOptionalDeliveryStatus(data.emailStatus),
+    smsStatus: readOptionalDeliveryStatus(data.smsStatus),
     recipient: readString(data.recipient) || readString(data.emailTo) || undefined,
     read: typeof data.read === "boolean" ? data.read : false,
     createdAt: toDate(data.createdAt),
@@ -223,19 +305,27 @@ function readEventType(value: unknown): NotificationEventType {
 }
 
 function readDeliveryChannel(value: unknown): NotificationHistoryItem["deliveryChannel"] {
-  if (value === "email" || value === "sms") {
+  if (value === "in_app" || value === "email" || value === "sms") {
     return value;
   }
 
-  return "email";
+  return "in_app";
 }
 
 function readDeliveryStatus(value: unknown): NotificationHistoryItem["deliveryStatus"] {
-  if (value === "sent" || value === "failed") {
+  if (value === "sent" || value === "failed" || value === "disabled") {
     return value;
   }
 
   return "sent";
+}
+
+function readOptionalDeliveryStatus(value: unknown) {
+  if (value === "sent" || value === "failed" || value === "disabled") {
+    return value;
+  }
+
+  return undefined;
 }
 
 function readString(value: unknown) {
