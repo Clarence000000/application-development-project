@@ -1,8 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import {
+  formatNotificationDate,
+  subscribeNotificationHistory,
+  type NotificationHistoryItem,
+} from "@/lib/notifications";
 
 export default function PortalLayout({
   children,
@@ -16,6 +23,37 @@ export default function PortalLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
+
+  useEffect(() => {
+    let unsubscribeNotifications: (() => void) | null = null;
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        unsubscribeNotifications?.();
+        unsubscribeNotifications = null;
+        setNotifications([]);
+        return;
+      }
+
+      unsubscribeNotifications?.();
+      unsubscribeNotifications = subscribeNotificationHistory(
+        user.uid,
+        (history) => setNotifications(history.slice(0, 4)),
+        (error) => console.error("Notification dropdown listener failed", error),
+      );
+    });
+
+    return () => {
+      unsubscribeNotifications?.();
+      unsubscribe();
+    };
+  }, []);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read).length,
+    [notifications],
+  );
 
   const handleLogout = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,6 +75,11 @@ export default function PortalLayout({
       name: "Review Status",
       href: "/review-status",
       icon: "fact_check",
+    },
+    {
+      name: "Notifications",
+      href: "/notifications",
+      icon: "notifications",
     },
   ];
 
@@ -65,23 +108,73 @@ export default function PortalLayout({
                 setSettingsOpen(false);
                 setProfileOpen(false);
               }}
-              className="material-symbols-outlined text-gray-600 dark:text-gray-400 hover:bg-gray-50 p-1.5 rounded-full transition-colors"
+              className="relative material-symbols-outlined text-gray-600 dark:text-gray-400 hover:bg-gray-50 p-1.5 rounded-full transition-colors"
             >
               notifications
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[10px] font-mono leading-4 text-white">
+                  {unreadCount}
+                </span>
+              )}
             </button>
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white border border-outline-variant rounded-xl shadow-lg z-50 py-2">
-                <p className="text-xs font-bold text-gray-500 px-3 py-2 border-b border-gray-100">
-                  Notifications
-                </p>
-                <div className="max-h-48 overflow-y-auto">
-                  <a className="block px-3 py-3 hover:bg-gray-50 rounded-lg transition-colors" href="#">
-                    <p className="text-xs font-semibold text-on-surface">Application Approved</p>
-                    <p className="text-[10px] text-on-surface-variant">
-                      Your Mastautin request is ready.
-                    </p>
-                  </a>
+                <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+                  <p className="text-xs font-bold text-gray-500">
+                    Notifications
+                  </p>
+                  <Link
+                    className="text-[10px] font-bold text-primary hover:underline"
+                    href="/notifications"
+                    onClick={() => setNotifOpen(false)}
+                  >
+                    View all
+                  </Link>
                 </div>
+                {notifications.length > 0 ? (
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.map((notification) => (
+                      <Link
+                        key={notification.id}
+                        className="block px-3 py-3 transition-colors hover:bg-gray-50"
+                        href={
+                          notification.referenceNumber
+                            ? `/review-status?focus=${encodeURIComponent(notification.referenceNumber)}`
+                            : "/notifications"
+                        }
+                        onClick={() => setNotifOpen(false)}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span
+                            className={`mt-0.5 h-2 w-2 rounded-full ${
+                              notification.read ? "bg-outline" : "bg-primary"
+                            }`}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold text-on-surface">
+                              {notification.title}
+                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-[10px] text-on-surface-variant">
+                              {notification.message}
+                            </p>
+                            <p className="mt-1 text-[9px] font-semibold text-outline">
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-6 text-center">
+                    <span className="material-symbols-outlined text-2xl text-outline">
+                      notifications_off
+                    </span>
+                    <p className="mt-1 text-xs font-semibold text-on-surface">
+                      No notifications yet
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,15 +1,32 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc,
+  type Timestamp,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import {
+  createInAppNotification,
+  triggerEmailNotification,
+} from "@/lib/notifications";
 
 type ApprovalStatus =
   | "Pending Review"
   | "Staff Vetted"
+  | "Action Required"
   | "Approved"
   | "Rejected";
 
 type ApplicationRecord = {
+  documentId: string;
   id: string;
+  uid: string;
   applicantName: string;
   idNumber: string;
   formName: string;
@@ -19,84 +36,11 @@ type ApplicationRecord = {
   purpose: string;
   address: string;
   phoneNumber: string;
+  emailAddress: string;
   supportingNotes: string;
+  sortTime: number;
   timeline: { title: string; date: string; done: boolean }[];
 };
-
-const initialApplications: ApplicationRecord[] = [
-  {
-    id: "PGH-2026-0184",
-    applicantName: "Ahmad Bin Zaki",
-    idNumber: "010203-01-1234",
-    formName: "Borang Pengesahan Bermastautin",
-    submittedDate: "02 Jun 2026",
-    mukim: "Mukim Ayer Hitam",
-    status: "Pending Review",
-    purpose: "Application for school assistance documentation.",
-    address: "No. 14, Jalan Mawar 3, Kampung Seri Aman, 86100 Ayer Hitam, Johor",
-    phoneNumber: "019-989 3697",
-    supportingNotes: "Applicant declared current residence as matching the service area.",
-    timeline: [
-      { title: "Application Submitted", date: "02 Jun 2026", done: true },
-      { title: "Staff Vetting", date: "Pending", done: false },
-      { title: "Penghulu Decision", date: "Pending", done: false },
-    ],
-  },
-  {
-    id: "PGH-2026-0179",
-    applicantName: "Nur Aisyah Binti Rahman",
-    idNumber: "990812-10-4456",
-    formName: "Borang Pengesahan Pendapatan",
-    submittedDate: "01 Jun 2026",
-    mukim: "Mukim Parit Raja",
-    status: "Staff Vetted",
-    purpose: "Income confirmation for welfare support application.",
-    address: "Lot 22, Kampung Parit Lapis, 86400 Parit Raja, Johor",
-    phoneNumber: "013-889 2110",
-    supportingNotes: "Self-employed applicant. Staff verified submitted income declaration.",
-    timeline: [
-      { title: "Application Submitted", date: "01 Jun 2026", done: true },
-      { title: "Staff Vetting", date: "03 Jun 2026", done: true },
-      { title: "Penghulu Decision", date: "Pending", done: false },
-    ],
-  },
-  {
-    id: "PGH-2026-0171",
-    applicantName: "Lim Wei Shen",
-    idNumber: "950604-01-2233",
-    formName: "Borang Pengurangan / Rayuan Bayaran Denda Kad Pengenalan",
-    submittedDate: "29 May 2026",
-    mukim: "Mukim Sri Gading",
-    status: "Approved",
-    purpose: "Appeal for reduction of damaged MyKad replacement fine.",
-    address: "32, Jalan Seroja, Taman Sri Gading, 83300 Batu Pahat, Johor",
-    phoneNumber: "016-502 8841",
-    supportingNotes: "Approved after Penghulu review. Formal letter can be issued after Sprint 3 flow.",
-    timeline: [
-      { title: "Application Submitted", date: "29 May 2026", done: true },
-      { title: "Staff Vetting", date: "30 May 2026", done: true },
-      { title: "Penghulu Decision", date: "31 May 2026", done: true },
-    ],
-  },
-  {
-    id: "PGH-2026-0166",
-    applicantName: "Siti Hajar Binti Musa",
-    idNumber: "020114-01-9988",
-    formName: "Borang Pengesahan Bermastautin",
-    submittedDate: "27 May 2026",
-    mukim: "Mukim Ayer Hitam",
-    status: "Rejected",
-    purpose: "Residence confirmation for banking record update.",
-    address: "No. 6, Jalan Cempaka, Taman Desa Jaya, 86100 Ayer Hitam, Johor",
-    phoneNumber: "011-1092 7762",
-    supportingNotes: "Rejected because declared residence was outside the selected mukim.",
-    timeline: [
-      { title: "Application Submitted", date: "27 May 2026", done: true },
-      { title: "Staff Vetting", date: "28 May 2026", done: true },
-      { title: "Penghulu Decision", date: "29 May 2026", done: true },
-    ],
-  },
-];
 
 const currentStaff = {
   name: "Staff Mukim Ayer Hitam",
@@ -114,6 +58,11 @@ const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: s
     dot: "bg-blue-600",
     icon: "fact_check",
   },
+  "Action Required": {
+    badge: "bg-yellow-100 text-yellow-800",
+    dot: "bg-yellow-600",
+    icon: "upload_file",
+  },
   Approved: {
     badge: "bg-green-100 text-green-800",
     dot: "bg-green-600",
@@ -127,19 +76,78 @@ const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: s
 };
 
 export default function ApprovalReviewPage() {
-  const [applications, setApplications] = useState(initialApplications);
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"All" | ApprovalStatus>("All");
   const [search, setSearch] = useState("");
   const [remarks, setRemarks] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const selectedApplication = applications.find((application) => application.id === selectedId);
+  useEffect(() => {
+    let isActive = true;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "applications"),
+      async (snapshot) => {
+        try {
+          const mappedApplications = await Promise.all(
+            snapshot.docs.map(async (applicationSnapshot) => {
+              const application = applicationSnapshot.data();
+              const uid = readString(application.uid, application.userId);
+              const userSnapshot = uid
+                ? await getDoc(doc(db, "users", uid))
+                : null;
+              const user = userSnapshot?.exists() ? userSnapshot.data() : {};
+
+              return mapApplicationRecord(
+                applicationSnapshot.id,
+                application,
+                user,
+              );
+            }),
+          );
+
+          if (isActive) {
+            setApplications(
+              mappedApplications.sort((left, right) => right.sortTime - left.sortTime),
+            );
+            setIsLoading(false);
+          }
+        } catch (error) {
+          console.error("Failed to load application queue", error);
+          if (isActive) {
+            setIsLoading(false);
+          }
+        }
+      },
+      (error) => {
+        console.error("Application queue listener failed", error);
+        if (isActive) {
+          setIsLoading(false);
+        }
+      },
+    );
+
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const selectedApplication = applications.find(
+    (application) => application.documentId === selectedId,
+  );
 
   const assignedApplications = useMemo(
     () =>
       applications.filter(
-        (application) => application.mukim === currentStaff.assignedMukim,
+        (application) =>
+          !application.mukim ||
+          application.mukim
+            .toLowerCase()
+            .includes(currentStaff.assignedMukim.toLowerCase()),
       ),
     [applications],
   );
@@ -162,6 +170,7 @@ export default function ApprovalReviewPage() {
     () => ({
       pending: assignedApplications.filter((application) => application.status === "Pending Review").length,
       vetted: assignedApplications.filter((application) => application.status === "Staff Vetted").length,
+      actionRequired: assignedApplications.filter((application) => application.status === "Action Required").length,
       approved: assignedApplications.filter((application) => application.status === "Approved").length,
       rejected: assignedApplications.filter((application) => application.status === "Rejected").length,
     }),
@@ -171,83 +180,111 @@ export default function ApprovalReviewPage() {
   const updateStatus = async (nextStatus: ApprovalStatus) => {
     if (!selectedApplication) return;
 
-    setApplications((current) =>
-      current.map((application) =>
-        application.id === selectedApplication.id
-          ? {
-              ...application,
-              status: nextStatus,
-              supportingNotes: remarks.trim() || application.supportingNotes,
-              timeline: application.timeline.map((step) => {
-                if (nextStatus === "Staff Vetted" && step.title === "Staff Vetting") {
-                  return { ...step, date: "Today", done: true };
-                }
-                if (
-                  (nextStatus === "Approved" || nextStatus === "Rejected") &&
-                  (step.title === "Staff Vetting" || step.title === "Penghulu Decision")
-                ) {
-                  return { ...step, date: step.done ? step.date : "Today", done: true };
-                }
-                return step;
-              }),
-            }
-          : application,
-      ),
-    );
+    const note = remarks.trim();
 
-    setToastMessage(`${selectedApplication.id} updated to ${nextStatus}.`);
-    setRemarks("");
+    try {
+      setIsUpdating(true);
+      await updateDoc(
+        doc(db, "applications", selectedApplication.documentId),
+        buildApplicationStatusUpdate(nextStatus, note),
+      );
+      const notificationCopy = buildDecisionNotificationCopy(
+        selectedApplication,
+        nextStatus,
+        note,
+      );
+      const notificationId = notificationCopy
+        ? await createInAppNotification({
+            uid: selectedApplication.uid,
+            title: notificationCopy.title,
+            message: notificationCopy.message,
+            applicationId: selectedApplication.documentId,
+            referenceNumber: selectedApplication.id,
+            applicationTitle: selectedApplication.formName,
+            eventType: "status_updated",
+          })
+        : null;
+      const notificationResults = await Promise.allSettled([
+        triggerDecisionEmail(selectedApplication, nextStatus, note, notificationId),
+        triggerDecisionSms(selectedApplication, nextStatus, notificationId),
+      ]);
+      const failedNotifications = notificationResults.filter(
+        (result) => result.status === "rejected",
+      );
 
-    if (nextStatus === "Approved" || nextStatus === "Rejected") {
-      try {
-        const response = await fetch("/api/twilio", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: selectedApplication.id,
-            applicantName: selectedApplication.applicantName,
-            formName: selectedApplication.formName,
-            phoneNumber: selectedApplication.phoneNumber,
-            status: nextStatus,
-            uid: "USR-" + selectedApplication.idNumber.split("-")[0],
-          }),
-        });
-
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          console.warn("SMS notification logged with failures or sandbox constraints checked.");
-        }
-      } catch (smsTriggerError) {
-        console.error("Failed to connect to the SMS backend service handler:", smsTriggerError);
+      if (failedNotifications.length === 0) {
+        showToast(`${selectedApplication.id} updated to ${nextStatus}.`);
+      } else {
+        console.error("Some decision notifications failed", failedNotifications);
+        showToast(`${selectedApplication.id} updated, but notification failed.`);
       }
+      setRemarks("");
+    } catch (error) {
+      console.error("Failed to update application status", error);
+      showToast("Application status could not be updated.");
+    } finally {
+      setIsUpdating(false);
     }
-
-    window.setTimeout(() => setToastMessage(""), 2800);
   };
 
-  const requestMissingDocument = () => {
+  const requestMissingDocument = async () => {
     if (!selectedApplication) return;
 
     const note =
       remarks.trim() ||
-      "Missing document request recorded. Applicant will be notified to upload the required document.";
+      `Additional documents are required for your ${selectedApplication.formName} application (${selectedApplication.id}). Please review the request and upload the required document.`;
 
-    setApplications((current) =>
-      current.map((application) =>
-        application.id === selectedApplication.id
-          ? {
-              ...application,
-              supportingNotes: note,
-            }
-          : application,
-      ),
-    );
-    setToastMessage(`${selectedApplication.id} missing document request recorded.`);
-    setRemarks("");
-    window.setTimeout(() => setToastMessage(""), 2800);
+    try {
+      setIsUpdating(true);
+      await updateDoc(doc(db, "applications", selectedApplication.documentId), {
+        status: "Action Required",
+        staffVetted: true,
+        staffVettedAt: serverTimestamp(),
+        officeComment: note,
+        actionRequiredAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      const notificationId = await createInAppNotification({
+        uid: selectedApplication.uid,
+        title: "Action Required",
+        message: note,
+        applicationId: selectedApplication.documentId,
+        referenceNumber: selectedApplication.id,
+        applicationTitle: selectedApplication.formName,
+        eventType: "document_requested",
+      });
+      try {
+        await triggerEmailNotification({
+          uid: selectedApplication.uid,
+          recipientEmail: selectedApplication.emailAddress,
+          recipientName: selectedApplication.applicantName,
+          notificationId,
+          applicationId: selectedApplication.documentId,
+          referenceNumber: selectedApplication.id,
+          applicationTitle: selectedApplication.formName,
+          eventType: "document_requested",
+          status: "Action Required",
+          message: note,
+          actionUrl: `/review-status?focus=${encodeURIComponent(selectedApplication.id)}`,
+        });
+        showToast(`${selectedApplication.id} missing document request recorded.`);
+      } catch (emailError) {
+        console.error("Failed to send missing document notification", emailError);
+        showToast(`${selectedApplication.id} updated, but email failed.`);
+      }
+      setRemarks("");
+    } catch (error) {
+      console.error("Failed to request missing document", error);
+      showToast("Missing document request could not be sent.");
+    } finally {
+      setIsUpdating(false);
+    }
   };
+
+  function showToast(message: string) {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(""), 2800);
+  }
 
   return (
     <div className="space-y-4">
@@ -267,9 +304,10 @@ export default function ApprovalReviewPage() {
             Assigned area: {currentStaff.assignedMukim}
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:w-auto">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 xl:w-auto">
           <StatusSummary label="Pending" value={counts.pending} tone="bg-secondary-container text-on-secondary-container" />
           <StatusSummary label="Vetted" value={counts.vetted} tone="bg-blue-100 text-blue-800" />
+          <StatusSummary label="Action" value={counts.actionRequired} tone="bg-yellow-100 text-yellow-800" />
           <StatusSummary label="Approved" value={counts.approved} tone="bg-green-100 text-green-800" />
           <StatusSummary label="Rejected" value={counts.rejected} tone="bg-error-container text-on-error-container" />
         </div>
@@ -305,6 +343,7 @@ export default function ApprovalReviewPage() {
               <option>All</option>
               <option>Pending Review</option>
               <option>Staff Vetted</option>
+              <option>Action Required</option>
               <option>Approved</option>
               <option>Rejected</option>
             </select>
@@ -327,7 +366,9 @@ export default function ApprovalReviewPage() {
           <div>
             <h2 className="text-sm font-bold text-primary">Application Queue</h2>
             <p className="text-[11px] font-medium text-on-surface-variant">
-              {filteredApplications.length} assigned record(s) shown
+              {isLoading
+                ? "Loading application records..."
+                : `${filteredApplications.length} assigned record(s) shown`}
             </p>
           </div>
           <span className="material-symbols-outlined text-outline">view_list</span>
@@ -352,7 +393,7 @@ export default function ApprovalReviewPage() {
 
                 return (
                   <tr
-                    key={application.id}
+                    key={application.documentId}
                     className="border-t border-outline-variant transition hover:bg-surface-container-low"
                   >
                     <td className="px-4 py-3">
@@ -384,7 +425,7 @@ export default function ApprovalReviewPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
-                        onClick={() => setSelectedId(application.id)}
+                        onClick={() => setSelectedId(application.documentId)}
                       >
                         View
                         <span className="material-symbols-outlined text-[15px]">chevron_right</span>
@@ -403,9 +444,9 @@ export default function ApprovalReviewPage() {
 
             return (
               <button
-                key={application.id}
+                key={application.documentId}
                 className="w-full px-4 py-3 text-left transition hover:bg-surface-container-low"
-                onClick={() => setSelectedId(application.id)}
+                onClick={() => setSelectedId(application.documentId)}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
@@ -441,7 +482,7 @@ export default function ApprovalReviewPage() {
           })}
         </div>
 
-        {filteredApplications.length === 0 && (
+        {!isLoading && filteredApplications.length === 0 && (
           <div className="p-8 text-center">
             <span className="material-symbols-outlined text-3xl text-outline">search_off</span>
             <p className="mt-2 text-sm font-bold text-on-surface">No matching applications</p>
@@ -514,6 +555,7 @@ export default function ApprovalReviewPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <DetailItem label="IC Number" value={selectedApplication.idNumber} />
                     <DetailItem label="Phone Number" value={selectedApplication.phoneNumber} />
+                    <DetailItem label="Email" value={selectedApplication.emailAddress} />
                     <DetailItem label="Mukim" value={selectedApplication.mukim} />
                     <DetailItem label="Submitted Date" value={selectedApplication.submittedDate} />
                   </div>
@@ -588,6 +630,7 @@ export default function ApprovalReviewPage() {
                   <div className="mt-3 space-y-2">
                     <button
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container"
+                      disabled={isUpdating}
                       onClick={() => updateStatus("Staff Vetted")}
                     >
                       <span className="material-symbols-outlined text-[16px]">fact_check</span>
@@ -595,6 +638,7 @@ export default function ApprovalReviewPage() {
                     </button>
                     <button
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800 transition hover:bg-yellow-100"
+                      disabled={isUpdating}
                       onClick={requestMissingDocument}
                     >
                       <span className="material-symbols-outlined text-[16px]">upload_file</span>
@@ -602,6 +646,7 @@ export default function ApprovalReviewPage() {
                     </button>
                     <button
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                      disabled={isUpdating}
                       onClick={() => updateStatus("Approved")}
                     >
                       <span className="material-symbols-outlined text-[16px]">verified</span>
@@ -609,6 +654,7 @@ export default function ApprovalReviewPage() {
                     </button>
                     <button
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-error px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                      disabled={isUpdating}
                       onClick={() => updateStatus("Rejected")}
                     >
                       <span className="material-symbols-outlined text-[16px]">cancel</span>
@@ -630,6 +676,293 @@ export default function ApprovalReviewPage() {
       )}
     </div>
   );
+}
+
+async function triggerDecisionEmail(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+  remarks: string,
+  notificationId: string | null,
+) {
+  if (
+    nextStatus === "Staff Vetted" ||
+    nextStatus === "Pending Review" ||
+    nextStatus === "Action Required"
+  ) {
+    return;
+  }
+
+  await triggerEmailNotification({
+    uid: application.uid,
+    recipientEmail: application.emailAddress,
+    recipientName: application.applicantName,
+    notificationId: notificationId || undefined,
+    applicationId: application.documentId,
+    referenceNumber: application.id,
+    applicationTitle: application.formName,
+    eventType: "status_updated",
+    status: nextStatus,
+    message: remarks || buildDecisionMessage(application, nextStatus),
+    actionUrl: `/review-status?focus=${encodeURIComponent(application.id)}`,
+  });
+}
+
+async function triggerDecisionSms(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+  notificationId: string | null,
+) {
+  if (nextStatus !== "Approved" && nextStatus !== "Rejected") {
+    return;
+  }
+
+  const phoneNumber = application.phoneNumber.trim();
+  if (!phoneNumber || phoneNumber === "-") {
+    return;
+  }
+
+  const response = await fetch("/api/twilio", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: application.id,
+      applicantName: application.applicantName,
+      formName: application.formName,
+      phoneNumber,
+      status: nextStatus,
+      uid: application.uid,
+      notificationId,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error || "SMS notification failed.");
+  }
+}
+
+function buildDecisionNotificationCopy(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+  remarks: string,
+) {
+  if (
+    nextStatus === "Staff Vetted" ||
+    nextStatus === "Pending Review" ||
+    nextStatus === "Action Required"
+  ) {
+    return null;
+  }
+
+  return {
+    title: `Application ${nextStatus}`,
+    message: remarks || buildDecisionMessage(application, nextStatus),
+  };
+}
+
+function buildDecisionMessage(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+) {
+  if (nextStatus === "Approved") {
+    return `Your ${application.formName} application (${application.id}) has been approved. You may view the latest status and download the approved document when it is available.`;
+  }
+
+  if (nextStatus === "Rejected") {
+    return `Your ${application.formName} application (${application.id}) has been rejected. Please review the reason provided by the Pejabat Penghulu.`;
+  }
+
+  return `Your ${application.formName} application (${application.id}) has a new update.`;
+}
+
+function buildApplicationStatusUpdate(
+  nextStatus: ApprovalStatus,
+  remarks: string,
+) {
+  const staffUser = auth.currentUser;
+  const baseUpdate = {
+    updatedAt: serverTimestamp(),
+    officeComment: remarks || null,
+  };
+
+  if (nextStatus === "Staff Vetted") {
+    return {
+      ...baseUpdate,
+      staffVetted: true,
+      staffVettedAt: serverTimestamp(),
+      staffVettedBy: staffUser?.email || currentStaff.name,
+      staffVettedByUid: staffUser?.uid || null,
+    };
+  }
+
+  if (nextStatus === "Approved") {
+    return {
+      ...baseUpdate,
+      status: "Approved",
+      staffVetted: true,
+      approvedAt: serverTimestamp(),
+      approvedBy: staffUser?.email || currentStaff.name,
+      approvedByUid: staffUser?.uid || null,
+      rejectedAt: null,
+      rejectionReason: null,
+    };
+  }
+
+  if (nextStatus === "Rejected") {
+    return {
+      ...baseUpdate,
+      status: "Rejected",
+      staffVetted: true,
+      rejectedAt: serverTimestamp(),
+      rejectionReason: remarks || "Permohonan ditolak oleh pihak Pejabat Penghulu.",
+      approvedAt: null,
+      approvedBy: null,
+      approvedByUid: null,
+    };
+  }
+
+  return baseUpdate;
+}
+
+function mapApplicationRecord(
+  documentId: string,
+  application: Record<string, unknown>,
+  user: Record<string, unknown>,
+): ApplicationRecord {
+  const values = readRecord(application.values, application.formData);
+  const status = mapApprovalStatus(application);
+  const submittedDate = formatFirestoreDate(application.submittedAt);
+  const submittedAt = toDate(application.submittedAt);
+  const staffVettedAt = formatFirestoreDate(application.staffVettedAt);
+  const approvedAt = formatFirestoreDate(application.approvedAt);
+  const rejectedAt = formatFirestoreDate(application.rejectedAt);
+  const actionRequiredAt = formatFirestoreDate(application.actionRequiredAt);
+
+  return {
+    documentId,
+    id:
+      readString(application.referenceNumber, application.applicationId) ||
+      documentId,
+    uid: readString(application.uid, application.userId),
+    applicantName: readString(values.name, user.name) || "Unknown Applicant",
+    idNumber: readString(values.idNumber, user.icNumber) || "-",
+    formName:
+      readString(application.formType, application.title) ||
+      "Permohonan Penghulu",
+    submittedDate,
+    mukim: readString(application.mukim, application.meta) || currentStaff.assignedMukim,
+    status,
+    purpose: readString(values.purpose, values.appealReason) || "-",
+    address:
+      readString(
+        values.residentialAddress,
+        values.icAddress,
+        user.addressCurrent,
+        user.addressIC,
+      ) || "-",
+    phoneNumber: readString(values.phoneNumber, user.phoneNumber) || "-",
+    emailAddress: readString(user.email, application.email, values.email),
+    supportingNotes:
+      readString(
+        application.officeComment,
+        application.rejectionReason,
+        application.staffComment,
+      ) || "No staff remarks recorded yet.",
+    sortTime: submittedAt?.getTime() || 0,
+    timeline: [
+      {
+        title: "Application Submitted",
+        date: submittedDate,
+        done: true,
+      },
+      {
+        title: "Staff Vetting",
+        date:
+          status === "Staff Vetted" ||
+          status === "Approved" ||
+          status === "Rejected" ||
+          status === "Action Required"
+            ? staffVettedAt
+            : "Pending",
+        done:
+          status === "Staff Vetted" ||
+          status === "Approved" ||
+          status === "Rejected" ||
+          status === "Action Required",
+      },
+      {
+        title:
+          status === "Action Required"
+            ? "Action Required"
+            : "Penghulu Decision",
+        date:
+          status === "Approved"
+            ? approvedAt
+            : status === "Rejected"
+              ? rejectedAt
+              : status === "Action Required"
+                ? actionRequiredAt
+                : "Pending",
+        done:
+          status === "Approved" ||
+          status === "Rejected" ||
+          status === "Action Required",
+      },
+    ],
+  };
+}
+
+function mapApprovalStatus(application: Record<string, unknown>): ApprovalStatus {
+  const status = readString(application.status).toLowerCase();
+
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (status === "action required") return "Action Required";
+  if (application.staffVetted === true) return "Staff Vetted";
+
+  return "Pending Review";
+}
+
+function formatFirestoreDate(value: unknown) {
+  const date = toDate(value);
+
+  if (!date) {
+    return "Pending";
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function toDate(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value) {
+    return (value as Timestamp).toDate();
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+}
+
+function readRecord(...values: unknown[]) {
+  const found = values.find((value) => value && typeof value === "object");
+  return found ? (found as Record<string, unknown>) : {};
+}
+
+function readString(...values: unknown[]) {
+  const found = values.find(
+    (value) => typeof value === "string" && value.trim(),
+  );
+
+  return typeof found === "string" ? found.trim() : "";
 }
 
 function StatusSummary({ label, value, tone }: { label: string; value: number; tone: string }) {

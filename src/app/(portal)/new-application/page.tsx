@@ -190,7 +190,7 @@ export default function NewApplicationPage() {
             </div>
           </div>
 
-          <div className="lg:w-2/5 h-48 lg:h-auto relative bg-surface-container">
+          <div className="lg:w-2/5 h-48 lg:h-auto relative overflow-hidden"> {/* Fixed overflow image when hover */}
             <img
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               alt="A professional view of a legal appeal document"

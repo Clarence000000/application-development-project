@@ -20,7 +20,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = (event: React.MouseEvent) => {
     event.preventDefault();
-    router.push("/login");
+    router.push("/staff/login");
   };
 
   const isAuthPage = pathname === "/staff/login" || pathname === "/staff/register";

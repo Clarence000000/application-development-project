@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
@@ -79,6 +79,20 @@ const mapCategory = (type: string) => {
 };
 
 export default function ReviewStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-sm font-medium text-secondary">
+          Sila tunggu, memuatkan maklumat permohonan...
+        </div>
+      }
+    >
+      <ReviewStatusContent />
+    </Suspense>
+  );
+}
+
+function ReviewStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusedId = searchParams.get("focus");
@@ -272,23 +286,25 @@ export default function ReviewStatusPage() {
                   className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                     app.status === "Approved"
                       ? "bg-green-50 text-green-700 border border-green-200"
-                      : app.status === "Action Required" ||
-                          app.status === "Rejected"
-                        ? "bg-error-container text-on-error-container"
-                        : app.status === "In Review"
-                          ? "bg-primary-container text-white"
-                          : "bg-surface-container text-on-surface-variant"
+                      : app.status === "Action Required"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : app.status === "Rejected"
+                          ? "bg-error-container text-on-error-container"
+                          : app.status === "In Review"
+                            ? "bg-primary-container text-white"
+                            : "bg-surface-container text-on-surface-variant"
                   }`}
                 >
                   <span className="material-symbols-outlined text-[20px]">
                     {app.status === "Approved"
                       ? "verified"
-                      : app.status === "Action Required" ||
-                          app.status === "Rejected"
-                        ? "warning"
-                        : app.status === "In Review"
-                          ? "description"
-                          : "edit_note"}
+                      : app.status === "Action Required"
+                        ? "error"
+                        : app.status === "Rejected"
+                          ? "warning"
+                          : app.status === "In Review"
+                            ? "description"
+                            : "edit_note"}
                   </span>
                 </div>
                 <div className="space-y-0.5">
@@ -437,7 +453,7 @@ export default function ReviewStatusPage() {
           </div>
         </div>
         <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-error flex items-center justify-center text-white shrink-0">
+          <div className="w-9 h-9 rounded-full bg-yellow-500 flex items-center justify-center text-white shrink-0">
             <span className="material-symbols-outlined text-[18px]">
               error_outline
             </span>
@@ -446,7 +462,7 @@ export default function ReviewStatusPage() {
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
               Pending Action
             </div>
-            <div className="text-sm font-bold text-error">
+            <div className="text-sm font-bold text-yellow-700">
               {actionRequiredCount} Applications
             </div>
           </div>
@@ -454,7 +470,7 @@ export default function ReviewStatusPage() {
         <div className="bg-surface-container border border-outline-variant p-3.5 rounded-xl flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-error flex items-center justify-center text-white shrink-0">
             <span className="material-symbols-outlined text-[18px]">
-              error_outline
+              warning
             </span>
           </div>
           <div>
@@ -760,7 +776,15 @@ function statusStyle(status: Application["status"]) {
     };
   }
 
-  if (status === "Action Required" || status === "Rejected") {
+  if (status === "Action Required") {
+    return {
+      statusColor: "text-yellow-800",
+      statusBg: "bg-yellow-100",
+      statusDot: "bg-yellow-600",
+    };
+  }
+
+  if (status === "Rejected") {
     return {
       statusColor: "text-on-error-container",
       statusBg: "bg-error-container",

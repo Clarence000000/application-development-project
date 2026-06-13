@@ -9,7 +9,11 @@ import {
 import { db } from "@/lib/firebase";
 import type { ApplicationFormConfig, ApplicationSlug } from "@/lib/applicationForms";
 
-export type ApplicationStatus = "In Review" | "Approved" | "Rejected";
+export type ApplicationStatus =
+  | "In Review"
+  | "Action Required"
+  | "Approved"
+  | "Rejected";
 
 export type ApplicationValues = Record<string, string>;
 
@@ -117,5 +121,5 @@ export function generateReferenceNumber(date = new Date()) {
     .join("")
     .toUpperCase();
 
-  return `GC-${year}-${randomCode}`;
+  return `APP-${year}-${randomCode}`;
 }
