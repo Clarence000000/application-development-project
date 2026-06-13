@@ -16,7 +16,7 @@ import type {
 
 export const runtime = "nodejs";
 
-type DeliveryStatus = "sent" | "skipped" | "failed";
+type DeliveryStatus = "sent" | "failed";
 
 const defaultPreferences: NotificationPreferences = {
   emailEnabled: true,
@@ -41,11 +41,6 @@ export async function POST(request: NextRequest) {
   const preferences = await getPreferences(payload.uid);
   const emailAllowed = isEmailAllowed(preferences, payload.eventType);
   const copy = buildNotificationCopy(payload, request.nextUrl.origin);
-
-  if (!emailAllowed) {
-    await createHistoryRecord(payload, copy, "skipped");
-    return NextResponse.json({ ok: true, deliveryStatus: "skipped" });
-  }
 
   try {
     const { transporter, deliveryStatus } = createTransporter();

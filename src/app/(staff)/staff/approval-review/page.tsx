@@ -185,12 +185,19 @@ export default function ApprovalReviewPage() {
         doc(db, "applications", selectedApplication.documentId),
         buildApplicationStatusUpdate(nextStatus, note),
       );
-      try {
-        await triggerDecisionEmail(selectedApplication, nextStatus, note);
+      const notificationResults = await Promise.allSettled([
+        triggerDecisionEmail(selectedApplication, nextStatus, note),
+        triggerDecisionSms(selectedApplication, nextStatus),
+      ]);
+      const failedNotifications = notificationResults.filter(
+        (result) => result.status === "rejected",
+      );
+
+      if (failedNotifications.length === 0) {
         showToast(`${selectedApplication.id} updated to ${nextStatus}.`);
-      } catch (emailError) {
-        console.error("Failed to send decision notification", emailError);
-        showToast(`${selectedApplication.id} updated, but email failed.`);
+      } else {
+        console.error("Some decision notifications failed", failedNotifications);
+        showToast(`${selectedApplication.id} updated, but notification failed.`);
       }
       setRemarks("");
     } catch (error) {
@@ -669,6 +676,40 @@ async function triggerDecisionEmail(
       `Your ${application.formName} application (${application.id}) has been updated to ${nextStatus}.`,
     actionUrl: `/review-status?focus=${encodeURIComponent(application.id)}`,
   });
+}
+
+async function triggerDecisionSms(
+  application: ApplicationRecord,
+  nextStatus: ApprovalStatus,
+) {
+  if (nextStatus !== "Approved" && nextStatus !== "Rejected") {
+    return;
+  }
+
+  const phoneNumber = application.phoneNumber.trim();
+  if (!phoneNumber || phoneNumber === "-") {
+    return;
+  }
+
+  const response = await fetch("/api/twilio", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: application.id,
+      applicantName: application.applicantName,
+      formName: application.formName,
+      phoneNumber,
+      status: nextStatus,
+      uid: application.uid,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error || "SMS notification failed.");
+  }
 }
 
 function buildApplicationStatusUpdate(

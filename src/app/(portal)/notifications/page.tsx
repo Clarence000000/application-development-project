@@ -20,8 +20,8 @@ import {
 export default function NotificationsPage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
-  const [preferences, setPreferences] = useState<NotificationPreferences>(
-    defaultNotificationPreferences,
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(
+    null,
   );
   const [history, setHistory] = useState<NotificationHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +67,7 @@ export default function NotificationsPage() {
     if (!userId) return;
 
     const nextPreferences = {
-      ...preferences,
+      ...(preferences || defaultNotificationPreferences),
       [key]: value,
     };
 
@@ -79,7 +79,7 @@ export default function NotificationsPage() {
       showToast("Notification preferences saved.");
     } catch (error) {
       console.error("Failed to save notification preferences", error);
-      setPreferences(preferences);
+      setPreferences(preferences || defaultNotificationPreferences);
       showToast("Preferences could not be saved.");
     } finally {
       setIsSaving(false);
@@ -98,6 +98,23 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error("Failed to mark notifications as read", error);
       showToast("Notifications could not be updated.");
+    }
+  }
+
+  async function handleMarkRead(notification: NotificationHistoryItem) {
+    if (notification.read) return;
+
+    try {
+      await markNotificationsAsRead([notification]);
+      setHistory((current) =>
+        current.map((item) =>
+          item.id === notification.id ? { ...item, read: true } : item,
+        ),
+      );
+      showToast("Notification marked as read.");
+    } catch (error) {
+      console.error("Failed to mark notification as read", error);
+      showToast("Notification could not be updated.");
     }
   }
 
@@ -120,14 +137,14 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header className="flex flex-col gap-3 border-b border-outline-variant pb-5 md:flex-row md:items-end md:justify-between">
+    <div className="mx-auto max-w-5xl space-y-5">
+      <header className="flex flex-col gap-3 border-b border-outline-variant pb-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary md:text-3xl">
-            Email Notifications
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary">
+            Notifications
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
-            Manage email alerts and review notification history for your submitted applications.
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
+            Manage alerts and review updates for your applications.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-2 text-xs font-bold text-on-surface">
@@ -143,10 +160,10 @@ export default function NotificationsPage() {
           <div className="flex items-start justify-between gap-3 border-b border-outline-variant pb-3">
             <div>
               <h2 className="text-sm font-bold text-primary">
-                Notification Preferences
+                Preferences
               </h2>
               <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-                Control which email alerts the system sends to your registered account.
+                Choose which alerts should reach you.
               </p>
             </div>
             {isSaving && (
@@ -156,60 +173,66 @@ export default function NotificationsPage() {
             )}
           </div>
 
-          <div className="mt-4 space-y-3">
-            <PreferenceToggle
-              checked={preferences.emailEnabled}
-              description="Master switch for all email alerts."
-              icon="mail"
-              label="Email alerts"
-              onChange={(checked) => updatePreference("emailEnabled", checked)}
-            />
-            <PreferenceToggle
-              checked={preferences.smsEnabled}
-              description="Reserved for SMS alerts when the SMS channel is enabled."
-              icon="sms"
-              label="SMS alerts"
-              onChange={(checked) => updatePreference("smsEnabled", checked)}
-            />
-            <PreferenceToggle
-              checked={preferences.applicationSubmitted}
-              description="Receive an email when a new application is recorded."
-              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
-              icon="outgoing_mail"
-              label="Application submitted"
-              onChange={(checked) =>
-                updatePreference("applicationSubmitted", checked)
-              }
-            />
-            <PreferenceToggle
-              checked={preferences.statusUpdates}
-              description="Receive updates for approval, rejection, or document requests."
-              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
-              icon="published_with_changes"
-              label="Status updates"
-              onChange={(checked) => updatePreference("statusUpdates", checked)}
-            />
-            <PreferenceToggle
-              checked={preferences.documentRequests}
-              description="Receive alerts when staff request additional documents."
-              disabled={!preferences.emailEnabled && !preferences.smsEnabled}
-              icon="upload_file"
-              label="Document requests"
-              onChange={(checked) =>
-                updatePreference("documentRequests", checked)
-              }
-            />
-          </div>
+          {preferences ? (
+            <div className="mt-4 space-y-2">
+              <PreferenceToggle
+                checked={preferences.emailEnabled}
+                icon="mail"
+                label="Email"
+                onChange={(checked) => updatePreference("emailEnabled", checked)}
+              />
+              <PreferenceToggle
+                checked={preferences.smsEnabled}
+                icon="sms"
+                label="SMS"
+                onChange={(checked) => updatePreference("smsEnabled", checked)}
+              />
+              <PreferenceToggle
+                checked={preferences.applicationSubmitted}
+                disabled={!preferences.emailEnabled && !preferences.smsEnabled}
+                icon="outgoing_mail"
+                label="Application submitted"
+                onChange={(checked) =>
+                  updatePreference("applicationSubmitted", checked)
+                }
+              />
+              <PreferenceToggle
+                checked={preferences.statusUpdates}
+                disabled={!preferences.emailEnabled && !preferences.smsEnabled}
+                icon="published_with_changes"
+                label="Status updates"
+                onChange={(checked) => updatePreference("statusUpdates", checked)}
+              />
+              <PreferenceToggle
+                checked={preferences.documentRequests}
+                disabled={!preferences.emailEnabled && !preferences.smsEnabled}
+                icon="upload_file"
+                label="Document requests"
+                onChange={(checked) =>
+                  updatePreference("documentRequests", checked)
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div
+                  className="h-[46px] animate-pulse rounded-lg bg-surface-container-low"
+                  key={index}
+                />
+              ))}
+            </div>
+          )}
         </aside>
 
         <section className="flex max-h-[calc(100vh-220px)] min-h-[520px] flex-col overflow-hidden rounded-lg border border-outline-variant bg-white">
           <div className="flex flex-col gap-3 border-b border-outline-variant px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-bold text-primary">
-                Notification History
+                History
               </h2>
               <p className="mt-0.5 text-xs text-on-surface-variant">
-                {history.length} email notification record(s)
+                {history.length} notification record(s)
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -247,6 +270,7 @@ export default function NotificationsPage() {
                   <NotificationHistoryRow
                     key={notification.id}
                     notification={notification}
+                    onMarkRead={handleMarkRead}
                   />
                 ))}
               </div>
@@ -281,14 +305,12 @@ export default function NotificationsPage() {
 
 function PreferenceToggle({
   checked,
-  description,
   disabled = false,
   icon,
   label,
   onChange,
 }: {
   checked: boolean;
-  description: string;
   disabled?: boolean;
   icon: string;
   label: string;
@@ -296,22 +318,19 @@ function PreferenceToggle({
 }) {
   return (
     <label
-      className={`flex items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest p-3 transition ${
+      className={`flex items-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2.5 transition ${
         disabled ? "opacity-55" : "hover:border-primary"
       }`}
     >
-      <span className="material-symbols-outlined mt-0.5 text-[19px] text-primary">
+      <span className="material-symbols-outlined text-[19px] text-primary">
         {icon}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold text-on-surface">{label}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-on-surface-variant">
-          {description}
-        </span>
       </span>
       <input
         checked={checked}
-        className="mt-1 h-4 w-4 accent-primary"
+        className="h-4 w-4 accent-primary"
         disabled={disabled}
         type="checkbox"
         onChange={(event) => onChange(event.target.checked)}
@@ -322,15 +341,16 @@ function PreferenceToggle({
 
 function NotificationHistoryRow({
   notification,
+  onMarkRead,
 }: {
   notification: NotificationHistoryItem;
+  onMarkRead: (notification: NotificationHistoryItem) => void;
 }) {
   const statusStyle = {
     sent: "bg-green-100 text-green-800",
-    preview: "bg-blue-100 text-blue-800",
-    skipped: "bg-surface-container-high text-on-surface-variant",
     failed: "bg-error-container text-on-error-container",
   }[notification.deliveryStatus];
+  const channelIcon = notification.deliveryChannel === "sms" ? "sms" : "mail";
 
   return (
     <div className="flex flex-col gap-3 px-4 py-4 transition hover:bg-surface-container-low sm:flex-row sm:items-start sm:justify-between">
@@ -343,7 +363,7 @@ function NotificationHistoryRow({
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">
-            {notification.read ? "mail" : "mark_email_unread"}
+            {notification.read ? channelIcon : "mark_email_unread"}
           </span>
         </div>
         <div className="min-w-0">
@@ -377,6 +397,15 @@ function NotificationHistoryRow({
         >
           {notification.deliveryStatus}
         </span>
+        {!notification.read && (
+          <button
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+            onClick={() => onMarkRead(notification)}
+            type="button"
+          >
+            Mark read
+          </button>
+        )}
         {notification.referenceNumber && (
           <Link
             className="text-xs font-bold text-primary hover:underline"

@@ -51,7 +51,7 @@ export type NotificationHistoryItem = {
   applicationTitle?: string;
   eventType: NotificationEventType;
   deliveryChannel: "email" | "sms";
-  deliveryStatus: "sent" | "skipped" | "failed";
+  deliveryStatus: "sent" | "failed";
   recipient?: string;
   read: boolean;
   createdAt: Date | null;
@@ -231,7 +231,7 @@ function readDeliveryChannel(value: unknown): NotificationHistoryItem["deliveryC
 }
 
 function readDeliveryStatus(value: unknown): NotificationHistoryItem["deliveryStatus"] {
-  if (value === "sent" || value === "skipped" || value === "failed") {
+  if (value === "sent" || value === "failed") {
     return value;
   }
 
