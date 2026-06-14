@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
@@ -25,6 +25,37 @@ export default function PortalLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
 
+  // ➕ Create Refs to track the dropdown containers
+  const notifRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // --- Click Outside Listener ---
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // If notification dropdown is open and the click is outside its ref boundary, close it
+      if (notifOpen && notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+      // If settings dropdown is open and the click is outside its ref boundary, close it
+      if (settingsOpen && settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setSettingsOpen(false);
+      }
+      // If profile dropdown is open and the click is outside its ref boundary, close it
+      if (profileOpen && profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+
+    // Bind the global window event listener
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      // Clean up the listener when the layout unmounts
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notifOpen, settingsOpen, profileOpen]);
+
+  // --- Existing Notification Auth Logic ---
   useEffect(() => {
     let unsubscribeNotifications: (() => void) | null = null;
 
@@ -61,26 +92,10 @@ export default function PortalLayout({
   };
 
   const navItems = [
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: "dashboard",
-    },
-    {
-      name: "New Application",
-      href: "/new-application",
-      icon: "description",
-    },
-    {
-      name: "Review Status",
-      href: "/review-status",
-      icon: "fact_check",
-    },
-    {
-      name: "Notifications",
-      href: "/notifications",
-      icon: "notifications",
-    },
+    { name: "Dashboard", href: "/dashboard", icon: "dashboard" },
+    { name: "New Application", href: "/new-application", icon: "description" },
+    { name: "Review Status", href: "/review-status", icon: "fact_check" },
+    { name: "Notifications", href: "/notifications", icon: "notifications" },
   ];
 
   return (
@@ -101,7 +116,7 @@ export default function PortalLayout({
 
         <div className="flex items-center gap-3">
           {/* Notifications Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={notifRef}>
             <button
               onClick={() => {
                 setNotifOpen(!notifOpen);
@@ -120,9 +135,7 @@ export default function PortalLayout({
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white border border-outline-variant rounded-xl shadow-lg z-50 py-2">
                 <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-                  <p className="text-xs font-bold text-gray-500">
-                    Notifications
-                  </p>
+                  <p className="text-xs font-bold text-gray-500">Notifications</p>
                   <Link
                     className="text-[10px] font-bold text-primary hover:underline"
                     href="/notifications"
@@ -180,7 +193,7 @@ export default function PortalLayout({
           </div>
 
           {/* Settings Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={settingsRef}>
             <button
               onClick={() => {
                 setSettingsOpen(!settingsOpen);
@@ -210,7 +223,7 @@ export default function PortalLayout({
           </div>
 
           {/* Profile Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={profileRef}>
             <button
               onClick={() => {
                 setProfileOpen(!profileOpen);
@@ -229,9 +242,13 @@ export default function PortalLayout({
             </button>
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-[#E2E8F0] rounded-xl shadow-lg z-50 py-2">
-                <a className="flex items-center gap-3 px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg" href="#">
+                <Link 
+                  href="/profile" 
+                  onClick={() => setProfileOpen(false)} 
+                  className="flex items-center gap-3 px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg"
+                >
                   <span className="material-symbols-outlined text-sm">person</span> View Profile
-                </a>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-3 py-2 text-sm text-error hover:bg-error-container/20 rounded-lg border-t border-gray-100 mt-1 cursor-pointer text-left"
@@ -276,7 +293,7 @@ export default function PortalLayout({
                   className={`flex items-center gap-3 px-4 py-2.5 transition-all text-sm font-semibold rounded-lg ${
                     isActive
                       ? "bg-gray-100 dark:bg-gray-800 text-[#002D62] dark:text-white border-l-4 border-[#002D62]"
-                      : "text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] hover:bg-gray-50 dark:hover:bg-gray-800" // Fixed dark text when hovering
+                      : "text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] hover:bg-gray-50 dark:hover:bg-gray-800"
                   }`}
                 >
                   <span
@@ -417,7 +434,7 @@ export default function PortalLayout({
             Privacy Policy
           </a>
           <a className="text-[11px] text-gray-500 hover:text-[#002D62] dark:hover:text-blue-400 transition-colors font-medium" href="#">
-            Terms &amp; Conditions
+            Terms & Conditions
           </a>
           <a className="text-[11px] text-gray-500 hover:text-[#002D62] dark:hover:text-blue-400 transition-colors font-medium" href="#">
             Contact Us

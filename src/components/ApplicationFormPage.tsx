@@ -10,6 +10,9 @@ import {
   createInAppNotification,
   triggerEmailNotification,
 } from "@/lib/notifications";
+import { useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; 
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -20,6 +23,7 @@ type ApplicationFormPageProps = {
 
 export default function ApplicationFormPage({ config }: ApplicationFormPageProps) {
   const router = useRouter();
+  
   const initialValues = useMemo(() => {
     return config.fields.reduce<FormValues>((values, field) => {
       values[field.name] = "";
@@ -33,6 +37,61 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedReferenceNumber, setSubmittedReferenceNumber] = useState("");
+
+  useEffect(() => {
+    async function autofillUserProfile() {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      try {
+        // Fetch the user document from the 'users' collection using the authenticated UID
+        const userDocRef = doc(db, "users", currentUser.uid);
+        const userSnapshot = await getDoc(userDocRef);
+
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.data();
+
+          setValues((currentValues) => {
+            const updatedValues = { ...currentValues };
+
+            // 1. Map 'name'
+            if (userData.name && "name" in updatedValues) {
+              updatedValues.name = userData.name;
+            }
+
+            // 2. Map 'icNumber' -> 'idNumber'
+            if (userData.icNumber && "idNumber" in updatedValues) {
+              updatedValues.idNumber = userData.icNumber;
+            }
+
+            // 3. Map 'addressIC' -> 'icAddress'
+            if (userData.addressIC && "icAddress" in updatedValues) {
+              updatedValues.icAddress = userData.addressIC;
+            }
+
+            // 4. Map 'citizenship' -> Normalizes "Warganegara" string to form value slug "warganegara"
+            if (userData.citizenship && "citizenship" in updatedValues) {
+              const normalizedCitizenship = userData.citizenship.toLowerCase().trim();
+              if (normalizedCitizenship === "warganegara" || normalizedCitizenship === "bukan warganegara") {
+                updatedValues.citizenship = normalizedCitizenship === "warganegara" ? "warganegara" : "bukan-warganegara";
+              }
+            }
+
+            // 5. Map 'phoneNumber' -> Safely auto-fills phone number if the current form configuration uses it
+            if (userData.phoneNumber && "phoneNumber" in updatedValues) {
+              updatedValues.phoneNumber = userData.phoneNumber;
+            }
+
+            return updatedValues;
+          });
+        }
+      } catch (error) {
+        console.error("Gagal melaksanaan pra-isi maklumat pengguna:", error);
+      }
+    }
+
+    autofillUserProfile();
+  }, [config.fields]);
 
   function updateValue(name: string, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
