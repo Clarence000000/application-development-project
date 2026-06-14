@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
   getDoc,
   onSnapshot,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
   type Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -44,7 +47,7 @@ type ApplicationRecord = {
 
 const currentStaff = {
   name: "Staff Mukim Ayer Hitam",
-  assignedMukim: "Mukim Ayer Hitam",
+  assignedDistrict: "Mukim Ayer Hitam",
 };
 
 const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: string }> = {
@@ -84,12 +87,47 @@ export default function ApprovalReviewPage() {
   const [toastMessage, setToastMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [staffDistrict, setStaffDistrict] = useState(currentStaff.assignedDistrict);
+  const [staffName, setStaffName] = useState(currentStaff.name);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      try {
+        const staffSnapshot = await getDoc(doc(db, "users", user.uid));
+        if (!staffSnapshot.exists()) return;
+
+        const staffData = staffSnapshot.data();
+        const district = readString(staffData.district);
+        const name = readString(staffData.name);
+
+        if (district) {
+          setStaffDistrict(district);
+        }
+
+        if (name) {
+          setStaffName(name);
+        }
+      } catch (error) {
+        console.error("Failed to load staff district", error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     let isActive = true;
+    setIsLoading(true);
+
+    const assignedApplicationQuery = query(
+      collection(db, "applications"),
+      where("district", "==", staffDistrict),
+    );
 
     const unsubscribe = onSnapshot(
-      collection(db, "applications"),
+      assignedApplicationQuery,
       async (snapshot) => {
         try {
           const mappedApplications = await Promise.all(
@@ -134,7 +172,7 @@ export default function ApprovalReviewPage() {
       isActive = false;
       unsubscribe();
     };
-  }, []);
+  }, [staffDistrict]);
 
   const selectedApplication = applications.find(
     (application) => application.documentId === selectedId,
@@ -144,12 +182,11 @@ export default function ApprovalReviewPage() {
     () =>
       applications.filter(
         (application) =>
-          !application.mukim ||
           application.mukim
             .toLowerCase()
-            .includes(currentStaff.assignedMukim.toLowerCase()),
+            .includes(staffDistrict.toLowerCase()),
       ),
-    [applications],
+    [applications, staffDistrict],
   );
 
   const filteredApplications = useMemo(() => {
@@ -186,7 +223,7 @@ export default function ApprovalReviewPage() {
       setIsUpdating(true);
       await updateDoc(
         doc(db, "applications", selectedApplication.documentId),
-        buildApplicationStatusUpdate(nextStatus, note),
+        buildApplicationStatusUpdate(nextStatus, note, staffName),
       );
       const notificationCopy = buildDecisionNotificationCopy(
         selectedApplication,
@@ -301,7 +338,7 @@ export default function ApprovalReviewPage() {
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
             <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-            Assigned area: {currentStaff.assignedMukim}
+            Assigned area: {staffDistrict}
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 xl:w-auto">
@@ -780,6 +817,7 @@ function buildDecisionMessage(
 function buildApplicationStatusUpdate(
   nextStatus: ApprovalStatus,
   remarks: string,
+  staffName: string,
 ) {
   const staffUser = auth.currentUser;
   const baseUpdate = {
@@ -792,7 +830,7 @@ function buildApplicationStatusUpdate(
       ...baseUpdate,
       staffVetted: true,
       staffVettedAt: serverTimestamp(),
-      staffVettedBy: staffUser?.email || currentStaff.name,
+    staffVettedBy: staffUser?.email || staffName,
       staffVettedByUid: staffUser?.uid || null,
     };
   }
@@ -803,7 +841,7 @@ function buildApplicationStatusUpdate(
       status: "Approved",
       staffVetted: true,
       approvedAt: serverTimestamp(),
-      approvedBy: staffUser?.email || currentStaff.name,
+      approvedBy: staffUser?.email || staffName,
       approvedByUid: staffUser?.uid || null,
       rejectedAt: null,
       rejectionReason: null,
@@ -852,7 +890,9 @@ function mapApplicationRecord(
       readString(application.formType, application.title) ||
       "Permohonan Penghulu",
     submittedDate,
-    mukim: readString(application.mukim, application.meta) || currentStaff.assignedMukim,
+    mukim:
+      readString(application.district, application.mukim, application.meta) ||
+      currentStaff.assignedDistrict,
     status,
     purpose: readString(values.purpose, values.appealReason) || "-",
     address:

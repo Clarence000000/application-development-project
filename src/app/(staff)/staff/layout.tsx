@@ -58,7 +58,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               <div className="border-b border-gray-100 px-3 py-2">
                 <p className="text-xs font-bold text-on-surface">Staff Account</p>
                 <p className="text-[10px] font-medium text-on-surface-variant">
-                  Mukim Ayer Hitam
+                  Staff Workspace
                 </p>
               </div>
               <button

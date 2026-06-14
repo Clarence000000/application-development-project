@@ -27,6 +27,8 @@ export type FirestoreApplication = {
   type: ApplicationSlug;
   title: string;
   status: ApplicationStatus;
+  district: string;
+  mukim: string;
   submittedAt: Timestamp | FieldValue;
   updatedAt: Timestamp | FieldValue;
   values: ApplicationValues;
@@ -58,6 +60,7 @@ export async function createApplicationDocument({
   const applicationRef = doc(collection(db, "applications"));
   const referenceNumber = generateReferenceNumber();
   const timelineDate = new Date().toLocaleDateString("ms-MY");
+  const district = values.district;
   const application: FirestoreApplication = {
     applicationId: applicationRef.id,
     referenceNumber,
@@ -68,10 +71,12 @@ export async function createApplicationDocument({
     type: config.slug,
     title: config.title,
     status: "In Review",
+    district,
+    mukim: district,
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     values,
-    meta: "Pejabat Penghulu Mukim Ayer Hitam",
+    meta: `Pejabat Penghulu ${district}`,
     timeline: [
       {
         title: "Permohonan Draf",

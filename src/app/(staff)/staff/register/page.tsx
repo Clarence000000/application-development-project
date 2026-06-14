@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { registerStaffAccount } from "../../../../lib/user_auth";
+import { districtOptions } from "@/lib/districts";
 
 export default function StaffRegisterPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function StaffRegisterPage() {
   const [fullName, setFullName] = useState("");
   const [staffId, setStaffId] = useState("");
   const [department, setDepartment] = useState("");
+  const [district, setDistrict] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,6 +40,7 @@ export default function StaffRegisterPage() {
         name: fullName,
         staffId,
         department,
+        district,
       });
 
       setSuccessMsg("Registration submitted for Penghulu approval.");
@@ -221,6 +224,38 @@ export default function StaffRegisterPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                     />
+                  </div>
+                </div>
+
+                {/* District Area */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="font-mono text-xs font-semibold text-on-surface-variant uppercase tracking-wider" htmlFor="district">
+                    Assigned District Area
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-[20px] group-focus-within:text-[#001736]">
+                      location_on
+                    </span>
+                    <select
+                      className="w-full pl-10 pr-10 py-2.5 bg-[#f7f9fb] border border-outline-variant rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm appearance-none cursor-pointer"
+                      id="district"
+                      required
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      disabled={isLoading}
+                    >
+                      <option value="" disabled>
+                        Select District Area
+                      </option>
+                      {districtOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-outline text-lg">
+                      expand_more
+                    </span>
                   </div>
                 </div>
 

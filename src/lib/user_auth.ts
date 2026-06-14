@@ -27,6 +27,7 @@ export interface UserProfile {
   // Staff Credentials (Sprint 2)
   staffId?: string;
   department?: string;
+  district?: string;
 }
 
 export type RegistrationPayload = Omit<UserProfile, "uid" | "role" | "createdAt" | "email">;
@@ -80,7 +81,7 @@ export const registerAccount = async (
 export const registerStaffAccount = async (
   email: string,
   password: string,
-  profileData: { name: string; staffId: string; department: string; }
+  profileData: { name: string; staffId: string; department: string; district: string; }
 ): Promise<UserProfile> => {
   // 1. Create the base authentication credentials
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -95,6 +96,7 @@ export const registerStaffAccount = async (
     name: profileData.name,
     staffId: profileData.staffId,
     department: profileData.department,
+    district: profileData.district,
   };
 
   // 3. Save to the 'users' collection in Firestore

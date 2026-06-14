@@ -13,6 +13,7 @@ import {
 import { useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
+import { districtOptions } from "@/lib/districts";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -28,7 +29,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
     return config.fields.reduce<FormValues>((values, field) => {
       values[field.name] = "";
       return values;
-    }, {});
+    }, { district: "" });
   }, [config.fields]);
 
   const [values, setValues] = useState<FormValues>(initialValues);
@@ -120,6 +121,10 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       if (field.type === "number" && value && Number(value) < 0) {
         nextErrors[field.name] = "Nilai tidak boleh negatif.";
       }
+    }
+
+    if (!values.district?.trim()) {
+      nextErrors.district = "Sila pilih daerah permohonan.";
     }
 
     if (values.residentialStatus === "lain-lain" && !values.otherResidentialStatus?.trim()) {
@@ -269,6 +274,34 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           <section className="border-b border-outline-variant p-5 md:p-6">
             <SectionTitle icon="person" title="Maklumat Pemohon" />
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label
+                  className="mb-1.5 block text-sm font-bold text-on-surface"
+                  htmlFor="district"
+                >
+                  Daerah / Kawasan Pejabat Penghulu <span className="text-error">*</span>
+                </label>
+                <select
+                  id="district"
+                  name="district"
+                  value={values.district}
+                  onChange={(event) => updateValue("district", event.target.value)}
+                  className={fieldClassName(errors.district)}
+                >
+                  <option value="">Pilih daerah permohonan</option>
+                  {districtOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Permohonan akan dihantar kepada staff yang bertugas di kawasan ini.
+                </p>
+                {errors.district && (
+                  <p className="mt-1 text-xs font-semibold text-error">{errors.district}</p>
+                )}
+              </div>
               {config.fields.map((field) => (
                 <div className={field.fullWidth ? "md:col-span-2" : ""} key={field.name}>
                   <label
