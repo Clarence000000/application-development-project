@@ -131,7 +131,11 @@ export default function ApprovalReviewPage() {
       async (snapshot) => {
         try {
           const mappedApplications = await Promise.all(
-            snapshot.docs.map(async (applicationSnapshot) => {
+            snapshot.docs
+            .filter((applicationSnapshot) => {
+              return readString(applicationSnapshot.data().status).toLowerCase() !== "draft";
+            })
+            .map(async (applicationSnapshot) => {
               const application = applicationSnapshot.data();
               const uid = readString(application.uid, application.userId);
               const userSnapshot = uid
@@ -328,7 +332,7 @@ export default function ApprovalReviewPage() {
       <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-            Staff / Penghulu Workspace
+            Staff Workspace
           </p>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-primary">
             Approval Review
@@ -362,7 +366,7 @@ export default function ApprovalReviewPage() {
               </span>
               <input
                 className="w-full rounded-lg border border-outline bg-surface-container-low py-2 pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                placeholder="Search by application ID, applicant, or borang name"
+                placeholder="Search by application ID, applicant, or form name"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -417,11 +421,11 @@ export default function ApprovalReviewPage() {
               <tr>
                 <th className="px-4 py-3">Application</th>
                 <th className="px-4 py-3">Applicant</th>
-                <th className="px-4 py-3">Borang</th>
+                <th className="px-4 py-3">Form</th>
                 <th className="px-4 py-3">Mukim</th>
                 <th className="px-4 py-3">Submitted</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Action</th>
+                <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -459,7 +463,7 @@ export default function ApprovalReviewPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={application.status} />
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-center">
                       <button
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
                         onClick={() => setSelectedId(application.documentId)}
@@ -617,7 +621,7 @@ export default function ApprovalReviewPage() {
                     </h3>
                     <textarea
                       className="min-h-32 w-full rounded-lg border border-outline bg-white p-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                      placeholder="Record staff or Penghulu remarks before updating the decision"
+                      placeholder="Record staff remarks before updating the decision"
                       value={remarks}
                       onChange={(event) => setRemarks(event.target.value)}
                     />
@@ -808,7 +812,7 @@ function buildDecisionMessage(
   }
 
   if (nextStatus === "Rejected") {
-    return `Your ${application.formName} application (${application.id}) has been rejected. Please review the reason provided by the Pejabat Penghulu.`;
+    return `Your ${application.formName} application (${application.id}) has been rejected. Please review the reason provided by the office.`;
   }
 
   return `Your ${application.formName} application (${application.id}) has a new update.`;
@@ -854,7 +858,7 @@ function buildApplicationStatusUpdate(
       status: "Rejected",
       staffVetted: true,
       rejectedAt: serverTimestamp(),
-      rejectionReason: remarks || "Permohonan ditolak oleh pihak Pejabat Penghulu.",
+      rejectionReason: remarks || "Application rejected by the office.",
       approvedAt: null,
       approvedBy: null,
       approvedByUid: null,
@@ -888,7 +892,7 @@ function mapApplicationRecord(
     idNumber: readString(values.idNumber, user.icNumber) || "-",
     formName:
       readString(application.formType, application.title) ||
-      "Permohonan Penghulu",
+      "Office Application",
     submittedDate,
     mukim:
       readString(application.district, application.mukim, application.meta) ||
@@ -936,7 +940,7 @@ function mapApplicationRecord(
         title:
           status === "Action Required"
             ? "Action Required"
-            : "Penghulu Decision",
+            : "Office Decision",
         date:
           status === "Approved"
             ? approvedAt

@@ -4,7 +4,6 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { generateSecureApplicationSerial } from "@/lib/serialGenerator";
@@ -29,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   if (!certificateData) {
     return NextResponse.json(
-      { error: "PDF hanya tersedia untuk permohonan yang telah diluluskan." },
+      { error: "PDF is only available for approved applications." },
       { status: 404 },
     );
   }
@@ -109,13 +108,13 @@ async function findApprovedCertificateDataFromFirestore(
       applicant: mapApplicant(values, user),
       approval: {
         approvedBy: String(
-          application.approvedBy || application.penghuluName || "Penghulu",
+          application.approvedBy || application.penghuluName || "Office",
         ),
         approvedAt,
         officeComment: String(
           application.officeComment ||
             application.approvalComment ||
-            "Permohonan telah disemak dan diluluskan oleh pihak Pejabat Penghulu.",
+            "The application has been reviewed and approved by the office.",
         ),
       },
     };

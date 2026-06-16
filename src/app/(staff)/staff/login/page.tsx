@@ -28,9 +28,9 @@ export default function StaffLoginPage() {
       console.log("Logged in administrative profile:", user);
       localStorage.setItem("userRole", user.role);
       router.push("/staff/approval-review");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err.message || "Invalid Staff ID or password. Access denied.");
+      setErrorMsg(getErrorMessage(err, "Invalid Staff ID or password. Access denied."));
       setIsLoading(false);
     }
   };
@@ -165,7 +165,7 @@ export default function StaffLoginPage() {
 
               <div className="text-center mt-4">
                 <p className="text-xs text-secondary">
-                  Don't have an account?
+                  Don&apos;t have an account?
                   <Link className="text-[#001736] font-semibold hover:underline transition-all ml-1" href="/staff/register">
                     Register New Account
                   </Link>
@@ -211,4 +211,12 @@ export default function StaffLoginPage() {
       </footer>
     </div>
   );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || fallback);
+  }
+
+  return fallback;
 }

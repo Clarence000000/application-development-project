@@ -43,13 +43,13 @@ export default function StaffRegisterPage() {
         district,
       });
 
-      setSuccessMsg("Registration submitted for Penghulu approval.");
+      setSuccessMsg("Registration submitted for office approval.");
       setTimeout(() => {
         router.push("/staff/login");
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      switch (err.code) {
+      switch (getErrorCode(err)) {
         case "auth/email-already-in-use":
           setErrorMsg("An account with this official email already exists.");
           break;
@@ -57,7 +57,7 @@ export default function StaffRegisterPage() {
           setErrorMsg("Password should be at least 6 characters.");
           break;
         default:
-          setErrorMsg(err.message || "Failed to create staff account.");
+          setErrorMsg(getErrorMessage(err, "Failed to create staff account."));
       }
       setIsLoading(false);
     }
@@ -96,7 +96,7 @@ export default function StaffRegisterPage() {
                 </span>
               </div>
               <p className="text-xs text-[#7594ca] leading-relaxed">
-                Access official Penghulu services and staff directory management. Your identity is
+                Access official certificate services and staff directory management. Your identity is
                 verified against the National Personnel Database.
               </p>
             </div>
@@ -193,7 +193,7 @@ export default function StaffRegisterPage() {
                       <option value="" disabled>
                         Select Department
                       </option>
-                      <option value="penghulu_office">Penghulu Office</option>
+                      <option value="penghulu_office">Office Administration</option>
                       <option value="civil_records">Civil Records</option>
                       <option value="community_affairs">Community Affairs</option>
                       <option value="it_admin">IT Administration</option>
@@ -376,4 +376,20 @@ export default function StaffRegisterPage() {
       </footer>
     </div>
   );
+}
+
+function getErrorCode(error: unknown) {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code?: unknown }).code || "");
+  }
+
+  return "";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || fallback);
+  }
+
+  return fallback;
 }

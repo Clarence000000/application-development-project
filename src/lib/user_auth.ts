@@ -1,13 +1,13 @@
 import { auth, db } from "./firebase"; 
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, type FieldValue } from "firebase/firestore";
 
 export interface UserProfile {
   uid: string;
   
   email: string;
   role: "Applicant" | "Admin" | "SuperAdmin";
-  createdAt: any;
+  createdAt: FieldValue;
   
   // Auto-filled via MyKad OCR Scan
   name?: string;

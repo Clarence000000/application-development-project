@@ -23,7 +23,7 @@ export default function NewApplicationPage() {
 
       {/* Bento Grid Layout for Application Types */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Application Card 1: Borang Pengesahan Bermastautin */}
+        {/* Application Card 1: Residential Verification Form */}
         <div className="lg:col-span-8 group bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden hover:border-primary transition-all flex flex-col md:flex-row">
           <div className="md:w-2/5 h-40 md:h-auto relative overflow-hidden">
             <img
@@ -40,7 +40,7 @@ export default function NewApplicationPage() {
                   <span className="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 inline-block">
                     Residential
                   </span>
-                  <h2 className="text-lg font-bold text-primary">Borang Pengesahan Bermastautin</h2>
+                  <h2 className="text-lg font-bold text-primary">Residential Verification Form</h2>
                 </div>
                 <span className="material-symbols-outlined text-primary-container text-[20px]">
                   home_pin
@@ -80,7 +80,7 @@ export default function NewApplicationPage() {
           </div>
         </div>
 
-        {/* Application Card 2: Borang Pengesahan Pendapatan */}
+        {/* Application Card 2: Income Verification Form */}
         <div className="lg:col-span-4 group bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden hover:border-primary transition-all flex flex-col">
           <div className="h-32 relative overflow-hidden">
             <img
@@ -95,7 +95,7 @@ export default function NewApplicationPage() {
                 <span className="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 inline-block">
                   Finance
                 </span>
-                <h2 className="text-lg font-bold text-primary">Borang Pengesahan Pendapatan</h2>
+                <h2 className="text-lg font-bold text-primary">Income Verification Form</h2>
               </div>
               <p className="text-on-surface-variant text-[13px] mb-4">
                 Verification of household income specifically for self-employed individuals.
@@ -130,7 +130,7 @@ export default function NewApplicationPage() {
           </div>
         </div>
 
-        {/* Application Card 3: Rayuan Bayaran Denda IC */}
+        {/* Application Card 3: Identity Card Fine Appeal */}
         <div className="lg:col-span-12 group bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden hover:border-primary transition-all flex flex-col lg:flex-row">
           <div className="p-6 lg:w-3/5 flex flex-col justify-between">
             <div>
@@ -138,7 +138,7 @@ export default function NewApplicationPage() {
                 <span className="bg-error-container text-on-error-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
                   Appeal
                 </span>
-                <h2 className="text-xl font-bold text-primary">Rayuan Bayaran Denda IC</h2>
+                <h2 className="text-xl font-bold text-primary">Identity Card Fine Appeal</h2>
               </div>
               <p className="text-on-surface-variant text-[14px] mb-6 max-w-xl">
                 Formal appeal for the reduction or waiver of fines related to IC loss or damage due

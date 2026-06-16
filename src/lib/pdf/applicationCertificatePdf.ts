@@ -70,9 +70,9 @@ export async function generateApplicationCertificatePdf(
   const documentRef = data.referenceNumber || data.applicationId;
 
   pdfDoc.setTitle(`${data.formType}-certificate-${documentRef}`);
-  pdfDoc.setSubject("Penghulu application certificate");
-  pdfDoc.setCreator("Sistem Pelbagai Perakuan Penghulu");
-  pdfDoc.setProducer("Sistem Pelbagai Perakuan Penghulu");
+  pdfDoc.setSubject("Application certificate");
+  pdfDoc.setCreator("Certificate Validation System");
+  pdfDoc.setProducer("Certificate Validation System");
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const firstPage = pdfDoc.getPage(0);
@@ -176,7 +176,7 @@ function fillResidentialPdf(
   });
   drawValue(
     page,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -185,7 +185,7 @@ function fillResidentialPdf(
       maxWidth: 165,
     },
   );
-  drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(page, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -209,7 +209,7 @@ function fillResidentialPdf(
   });
   drawValue(
     secondPage,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -218,7 +218,7 @@ function fillResidentialPdf(
       maxWidth: 165,
     },
   );
-  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(secondPage, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -227,7 +227,6 @@ function fillResidentialPdf(
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
     date: { x: 426, y: 447, maxWidth: 75 },
-    name: { x: 158, y: 417, maxWidth: 255 },
   });
 }
 
@@ -281,7 +280,7 @@ function fillIncomePdf(
   });
   drawValue(
     page,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -290,7 +289,7 @@ function fillIncomePdf(
       maxWidth: 165,
     },
   );
-  drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(page, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -314,7 +313,7 @@ function fillIncomePdf(
   });
   drawValue(
     secondPage,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -323,7 +322,7 @@ function fillIncomePdf(
       maxWidth: 165,
     },
   );
-  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(secondPage, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -332,7 +331,6 @@ function fillIncomePdf(
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
     date: { x: 426, y: 447, maxWidth: 75 },
-    name: { x: 158, y: 417, maxWidth: 255 },
   });
 }
 
@@ -399,7 +397,7 @@ function fillIcAppealPdf(
   });
   drawValue(
     page,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -408,7 +406,7 @@ function fillIcAppealPdf(
       maxWidth: 165,
     },
   );
-  drawValue(page, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(page, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -432,7 +430,7 @@ function fillIcAppealPdf(
   });
   drawValue(
     secondPage,
-    `No. Rujukan: ${data.referenceNumber || data.applicationId}`,
+    `Reference No.: ${data.referenceNumber || data.applicationId}`,
     regularFont,
     {
       x: 420,
@@ -441,7 +439,7 @@ function fillIcAppealPdf(
       maxWidth: 165,
     },
   );
-  drawValue(secondPage, `No. Siri: ${data.serialNumber || "-"}`, regularFont, {
+  drawValue(secondPage, `Serial No.: ${data.serialNumber || "-"}`, regularFont, {
     x: 420,
     y: 793,
     size: 8,
@@ -450,7 +448,6 @@ function fillIcAppealPdf(
   drawApproval(secondPage, data, regularFont, boldFont, {
     comment: { x: 73, y: 500, maxWidth: 436, maxLines: 2, lineGap: 17.5 },
     date: { x: 426, y: 447, maxWidth: 75 },
-    name: { x: 158, y: 417, maxWidth: 255 },
   });
 }
 
@@ -476,7 +473,6 @@ function drawApproval(
   fields: {
     comment: PdfField;
     date: PdfField;
-    name: PdfField;
   },
 ) {
   drawValue(page, data.approval.officeComment, regularFont, fields.comment);
@@ -486,7 +482,6 @@ function drawApproval(
     regularFont,
     fields.date,
   );
-  drawValue(page, data.approval.approvedBy, boldFont, fields.name);
 }
 
 function drawValue(

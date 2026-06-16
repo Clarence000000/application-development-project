@@ -57,7 +57,7 @@ export default function LoginPage() {
       <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-white dark:bg-gray-900 border-b border-[#E2E8F0] dark:border-gray-800">
         <div className="flex items-center gap-4">
           <span className="text-lg font-bold text-[#002D62] dark:text-white tracking-tight">
-            Sistem Borang Pengesahan Penghulu
+            Pelbagai Perakuan Penghulu System
           </span>
         </div>
       </header>
@@ -69,7 +69,7 @@ export default function LoginPage() {
           {/* Branding/Hero Section */}
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-8 animate-fade-in">
              <h1 className="text-4xl font-extrabold text-primary leading-tight tracking-tight">
-                Sistem Borang Pengesahan Penghulu
+                Pelbagai Perakuan Penghulu System
              </h1>
           </div>
 
