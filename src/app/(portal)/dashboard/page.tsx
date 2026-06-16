@@ -100,12 +100,9 @@ export default function DashboardPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-primary mb-0.5">
           {isLoading
-            ? "Sila tunggu..."
-            : `Selamat Datang, ${userName || "Pemohon"}`}
+            ? "Please wait..."
+            : `Welcome back, ${userName || "Pemohon"}!`}
         </h1>
-        <p className="text-sm text-secondary">
-          Quick access to your certificate applications and latest status.
-        </p>
       </header>
 
       {/* Certificate Options */}
@@ -136,7 +133,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Borang Pengesahan Bermastautin
+              Residential Verification Form
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
               Verification of permanent resident address in this sub-district.
@@ -160,7 +157,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Borang Pengesahan Pendapatan
+              Income Verification Form
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
               Income verification certificate for various official and welfare
@@ -185,7 +182,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Rayuan Bayaran Denda IC
+              Identity Card Fine Appeal
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
               Appeal for reduction of IC damage or loss fines with sub-district
@@ -221,7 +218,7 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {isLoading ? (
               <div className="text-center py-6 text-sm text-secondary font-medium">
-                Sila tunggu, memuatkan status permohonan...
+                Please wait, loading application status...
               </div>
             ) : applications.length > 0 ? (
               applications.map((app) => {
@@ -289,7 +286,7 @@ export default function DashboardPage() {
                           {app.title}
                         </p>
                         <p className="text-[11px] text-on-surface-variant">
-                          Dihantar pada {formattedDate}
+                          Submitted on {formattedDate}
                         </p>
                       </div>
                     </div>
@@ -308,8 +305,8 @@ export default function DashboardPage() {
               })
             ) : (
               <div className="bg-white border border-outline-variant border-dashed rounded-lg p-6 text-center text-xs text-on-surface-variant">
-                Tiada permohonan aktif ditemui. Sila klik "Apply for a
-                Certificate" untuk membuat permohonan baru.
+                No active applications were found. Please click "Apply for a
+                Certificate" to create a new application.
               </div>
             )}
           </div>
@@ -322,8 +319,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <p className="text-xs text-on-surface-variant max-w-[200px]">
-              Sejarah permohonan anda dipaparkan mengikut kemas kini terbaru
-              secara langsung dari sistem.
+              Your application history is displayed in real time, updated directly from the system.
             </p>
           </div>
         </div>

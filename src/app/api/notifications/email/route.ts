@@ -190,7 +190,7 @@ function getMailFromAddress() {
   return (
     process.env.NODEMAILER_SMTP_FROM ||
     process.env.NODEMAILER_SMTP_USER ||
-    "Pejabat Penghulu <no-reply@penghulu.local>"
+    "Certificate Portal <no-reply@certificate.local>"
   );
 }
 
@@ -279,8 +279,8 @@ function buildNotificationCopy(
     origin,
   );
   const greeting = payload.recipientName
-    ? `Assalamualaikum/Salam sejahtera ${payload.recipientName},`
-    : "Assalamualaikum/Salam sejahtera,";
+    ? `Hello ${payload.recipientName},`
+    : "Hello,";
 
   if (payload.eventType === "application_submitted") {
     const title = "Application Submitted";
@@ -289,8 +289,8 @@ function buildNotificationCopy(
     return {
       title,
       summary,
-      subject: `[Penghulu Portal] Application received - ${reference}`,
-      text: `${greeting}\n\n${summary}\n\nYou can review the latest status here: ${actionUrl}\n\nPejabat Penghulu Mukim Ayer Hitam`,
+      subject: `[Certificate Portal] Application received - ${reference}`,
+      text: `${greeting}\n\n${summary}\n\nYou can review the latest status here: ${actionUrl}\n\nCertificate Portal`,
       html: emailTemplate({
         greeting,
         title,
@@ -311,8 +311,8 @@ function buildNotificationCopy(
     return {
       title,
       summary,
-      subject: `[Penghulu Portal] Action required - ${reference}`,
-      text: `${greeting}\n\n${summary}\n\nPlease review your application here: ${actionUrl}\n\nPejabat Penghulu Mukim Ayer Hitam`,
+      subject: `[Certificate Portal] Action required - ${reference}`,
+      text: `${greeting}\n\n${summary}\n\nPlease review your application here: ${actionUrl}\n\nCertificate Portal`,
       html: emailTemplate({
         greeting,
         title,
@@ -331,8 +331,8 @@ function buildNotificationCopy(
   return {
     title,
     summary,
-    subject: `[Penghulu Portal] Status updated - ${reference}`,
-    text: `${greeting}\n\n${summary}\n\nYou can review the latest status here: ${actionUrl}\n\nPejabat Penghulu Mukim Ayer Hitam`,
+    subject: `[Certificate Portal] Status updated - ${reference}`,
+    text: `${greeting}\n\n${summary}\n\nYou can review the latest status here: ${actionUrl}\n\nCertificate Portal`,
     html: emailTemplate({
       greeting,
       title,
@@ -353,7 +353,7 @@ function buildStatusSummary(
   }
 
   if (payload.status === "Rejected") {
-    return `Your ${payload.applicationTitle} application (${reference}) has been rejected. Please review the reason provided by the Pejabat Penghulu.`;
+    return `Your ${payload.applicationTitle} application (${reference}) has been rejected. Please review the reason provided by the office.`;
   }
 
   return `Your ${payload.applicationTitle} application (${reference}) has a new update.`;
@@ -395,7 +395,7 @@ function emailTemplate({
         </a>
       </p>
       <p style="font-size: 12px; color: #6b7280; margin-top: 24px;">
-        This is an automated notification from Pejabat Penghulu Mukim Ayer Hitam.
+        This is an automated notification from the Certificate Portal.
       </p>
     </div>
   `;

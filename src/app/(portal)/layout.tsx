@@ -23,6 +23,7 @@ export default function PortalLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
 
   // ➕ Create Refs to track the dropdown containers
@@ -91,6 +92,19 @@ export default function PortalLayout({
     router.push("/login");
   };
 
+  const handleSettings = (e: React.MouseEvent) => {
+    router.push("/settings");
+  };
+
+  const toggleSidebar = () => {
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setDesktopSidebarOpen((current) => !current);
+      return;
+    }
+
+    setMobileMenuOpen((current) => !current);
+  };
+
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: "dashboard" },
     { name: "New Application", href: "/new-application", icon: "description" },
@@ -104,13 +118,16 @@ export default function PortalLayout({
       <header className="fixed top-0 left-0 w-full h-14 flex items-center justify-between px-6 z-50 bg-white dark:bg-gray-900 border-b border-[#E2E8F0] dark:border-gray-800">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden material-symbols-outlined text-gray-600 dark:text-gray-400 hover:bg-gray-50 p-1.5 rounded-full"
+            type="button"
+            aria-label="Toggle sidebar menu"
+            aria-expanded={mobileMenuOpen}
+            onClick={toggleSidebar}
+            className="material-symbols-outlined text-gray-600 dark:text-gray-400 hover:bg-gray-50 p-1.5 rounded-full"
           >
             menu
           </button>
           <span className="text-base font-bold text-[#002D62] dark:text-white tracking-tight">
-            Penghulu Certificate Validation System
+            MyPerakuan
           </span>
         </div>
 
@@ -192,36 +209,6 @@ export default function PortalLayout({
             )}
           </div>
 
-          {/* Settings Dropdown */}
-          <div className="relative" ref={settingsRef}>
-            <button
-              onClick={() => {
-                setSettingsOpen(!settingsOpen);
-                setNotifOpen(false);
-                setProfileOpen(false);
-              }}
-              className="material-symbols-outlined text-gray-600 dark:text-gray-400 hover:bg-gray-50 p-1.5 rounded-full transition-colors"
-            >
-              settings
-            </button>
-            {settingsOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-[#E2E8F0] rounded-xl shadow-lg z-50 py-2">
-                <a className="flex items-center gap-3 px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg" href="#">
-                  <span className="material-symbols-outlined text-sm">language</span> Language
-                </a>
-                <div className="flex items-center justify-between px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-sm">dark_mode</span> Dark Mode
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input className="sr-only peer" type="checkbox" />
-                    <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Profile Dropdown */}
           <div className="relative" ref={profileRef}>
             <button
@@ -243,7 +230,7 @@ export default function PortalLayout({
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-[#E2E8F0] rounded-xl shadow-lg z-50 py-2">
                 <Link 
-                  href="/profile" 
+                  href="/settings" 
                   onClick={() => setProfileOpen(false)} 
                   className="flex items-center gap-3 px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg"
                 >
@@ -264,7 +251,13 @@ export default function PortalLayout({
       {/* Sidebar and Main Content Wrapper */}
       <div className="flex flex-1 pt-14">
         {/* SideNavBar (Desktop) */}
-        <aside className="w-60 h-[calc(100vh-56px)] sticky top-14 flex flex-col py-4 bg-white dark:bg-gray-900 border-r border-[#E2E8F0] dark:border-gray-800 z-40 hidden md:flex">
+        <aside
+          className={`sticky top-14 z-40 hidden h-[calc(100vh-56px)] shrink-0 flex-col overflow-hidden bg-white py-4 transition-[width,border-color] duration-300 ease-in-out dark:bg-gray-900 md:flex ${
+            desktopSidebarOpen
+              ? "w-60 border-r border-[#E2E8F0] dark:border-gray-800"
+              : "w-0 border-r border-transparent"
+          }`}
+        >
           <div className="px-5 mb-6">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-primary flex items-center justify-center rounded-lg">
@@ -316,6 +309,13 @@ export default function PortalLayout({
             </button>
           </div>
           <div className="px-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+            <button
+              onClick={handleSettings}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] transition-all text-sm font-semibold cursor-pointer text-left"
+            >
+              <span className="material-symbols-outlined text-xl">settings</span>
+              <span>Settings</span>
+            </button>
             <a className="flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] transition-all text-sm font-semibold" href="#">
               <span className="material-symbols-outlined text-xl">help</span>
               <span>Help</span>
@@ -337,7 +337,7 @@ export default function PortalLayout({
               className="fixed inset-0 bg-black/50 z-40 md:hidden"
               onClick={() => setMobileMenuOpen(false)}
             ></div>
-            <aside className="fixed left-0 top-0 bottom-0 w-60 flex flex-col py-4 bg-white dark:bg-gray-900 border-r border-[#E2E8F0] dark:border-gray-800 z-50 animate-slide-in">
+            <aside className="fixed left-0 top-0 bottom-0 w-60 flex flex-col py-4 bg-white dark:bg-gray-900 border-r border-[#E2E8F0] dark:border-gray-800 z-50 animate-slide-in md:hidden">
               <div className="px-5 mb-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-primary flex items-center justify-center rounded-lg">
@@ -422,9 +422,13 @@ export default function PortalLayout({
       </div>
 
       {/* Footer */}
-      <footer className="md:pl-60 py-4 px-6 flex flex-col md:flex-row justify-between items-center bg-gray-50 dark:bg-gray-950 border-t border-[#E2E8F0] dark:border-gray-800 text-xs">
+      <footer
+        className={`py-4 px-6 flex flex-col md:flex-row justify-between items-center bg-gray-50 dark:bg-gray-950 border-t border-[#E2E8F0] dark:border-gray-800 text-xs ${
+          desktopSidebarOpen ? "md:pl-60" : ""
+        }`}
+      >
         <div className="flex flex-col">
-          <span className="text-xs font-bold text-gray-900 dark:text-white">Penghulu Portal</span>
+          <span className="text-xs font-bold text-gray-900 dark:text-white">Citizen Portal</span>
           <p className="text-[10px] text-gray-500 dark:text-gray-400">
             © 2024 Government of Malaysia. All Rights Reserved.
           </p>

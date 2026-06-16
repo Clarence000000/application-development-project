@@ -1,8 +1,13 @@
 import {
   collection,
+  deleteDoc,
   doc,
+  getDoc,
+  getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   type FieldValue,
   type Timestamp,
 } from "firebase/firestore";
@@ -10,6 +15,7 @@ import { db } from "@/lib/firebase";
 import type { ApplicationFormConfig, ApplicationSlug } from "@/lib/applicationForms";
 
 export type ApplicationStatus =
+  | "Draft"
   | "In Review"
   | "Action Required"
   | "Approved"
@@ -28,10 +34,10 @@ export type FirestoreApplication = {
   title: string;
   status: ApplicationStatus;
   district: string;
-  mukim: string;
-  submittedAt: Timestamp | FieldValue;
+  submittedAt: Timestamp | FieldValue | null;
   updatedAt: Timestamp | FieldValue;
   values: ApplicationValues;
+  declarationAccepted?: boolean;
   meta: string;
   timeline: {
     title: string;
@@ -52,13 +58,20 @@ export async function createApplicationDocument({
   uid,
   config,
   values,
+  applicationId,
 }: {
   uid: string;
   config: ApplicationFormConfig;
   values: ApplicationValues;
+  applicationId?: string;
 }) {
-  const applicationRef = doc(collection(db, "applications"));
-  const referenceNumber = generateReferenceNumber();
+  const applicationRef = applicationId
+    ? doc(db, "applications", applicationId)
+    : doc(collection(db, "applications"));
+  const existingSnapshot = await getDoc(applicationRef);
+  const existingData = existingSnapshot.exists() ? existingSnapshot.data() : {};
+  const referenceNumber =
+    readString(existingData.referenceNumber) || generateReferenceNumber();
   const timelineDate = new Date().toLocaleDateString("ms-MY");
   const district = values.district;
   const application: FirestoreApplication = {
@@ -72,34 +85,34 @@ export async function createApplicationDocument({
     title: config.title,
     status: "In Review",
     district,
-    mukim: district,
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     values,
-    meta: `Pejabat Penghulu ${district}`,
+    declarationAccepted: true,
+    meta: `${district}`,
     timeline: [
       {
-        title: "Permohonan Draf",
+        title: "Draft Application",
         date: timelineDate,
-        desc: "Pemohon mula mengisi borang",
+        desc: "Applicant started filling in the form",
         done: true,
       },
       {
-        title: "Permohonan Dihantar",
+        title: "Application Submitted",
         date: timelineDate,
-        desc: "Permohonan berjaya dihantar ke Pejabat Penghulu",
+        desc: "Application was successfully submitted to the office",
         done: true,
       },
       {
-        title: "Dalam Semakan",
+        title: "Under Review",
         date: "In Review",
-        desc: "Menunggu pengesahan daripada Penghulu",
+        desc: "Awaiting office verification",
         done: false,
       },
       {
-        title: "Kelulusan Akhir",
+        title: "Final Approval",
         date: "In Review",
-        desc: "Pengeluaran sijil rasmi",
+        desc: "Official certificate issuance",
         done: false,
       },
     ],
@@ -119,6 +132,103 @@ export async function createApplicationDocument({
   };
 }
 
+export async function saveDraftApplicationDocument({
+  uid,
+  config,
+  values,
+  declarationAccepted,
+  applicationId,
+}: {
+  uid: string;
+  config: ApplicationFormConfig;
+  values: ApplicationValues;
+  declarationAccepted: boolean;
+  applicationId?: string;
+}) {
+  const applicationRef = applicationId
+    ? doc(db, "applications", applicationId)
+    : doc(collection(db, "applications"));
+  const existingSnapshot = await getDoc(applicationRef);
+  const existingData = existingSnapshot.exists() ? existingSnapshot.data() : {};
+  const referenceNumber =
+    readString(existingData.referenceNumber) || generateReferenceNumber();
+  const district = values.district;
+
+  await setDoc(
+    applicationRef,
+    {
+      applicationId: applicationRef.id,
+      referenceNumber,
+      uid,
+      userId: uid,
+      formType: config.title,
+      formSlug: config.slug,
+      type: config.slug,
+      title: config.title,
+      status: "Draft",
+      district,
+      submittedAt: null,
+      updatedAt: serverTimestamp(),
+      draftSavedAt: serverTimestamp(),
+      values,
+      declarationAccepted,
+      meta: district ? `Mukim ${district}` : "None",
+      serialNumber: null,
+      approvedAt: null,
+      approvedBy: null,
+      approvedByUid: null,
+      officeComment: null,
+      rejectedAt: null,
+      rejectionReason: null,
+    },
+    { merge: true },
+  );
+
+  return {
+    applicationId: applicationRef.id,
+    referenceNumber,
+  };
+}
+
+export async function getLatestDraftApplication({
+  uid,
+  config,
+}: {
+  uid: string;
+  config: ApplicationFormConfig;
+}) {
+  const querySnapshot = await getDocs(
+    query(
+      collection(db, "applications"),
+      where("userId", "==", uid),
+      where("formSlug", "==", config.slug),
+      where("status", "==", "Draft"),
+    ),
+  );
+
+  const drafts = querySnapshot.docs
+    .map((snapshot) => {
+      const data = snapshot.data();
+      const updatedAt = toDate(data.updatedAt) || toDate(data.draftSavedAt);
+
+      return {
+        applicationId: snapshot.id,
+        values: readApplicationValues(data.values),
+        declarationAccepted: data.declarationAccepted === true,
+        updatedAt,
+      };
+    })
+    .sort((left, right) => {
+      return (right.updatedAt?.getTime() || 0) - (left.updatedAt?.getTime() || 0);
+    });
+
+  return drafts[0] || null;
+}
+
+export async function deleteDraftApplicationDocument(applicationId: string) {
+  await deleteDoc(doc(db, "applications", applicationId));
+}
+
 export function generateReferenceNumber(date = new Date()) {
   const year = date.getFullYear();
   const randomCode = Array.from(crypto.getRandomValues(new Uint8Array(3)))
@@ -127,4 +237,35 @@ export function generateReferenceNumber(date = new Date()) {
     .toUpperCase();
 
   return `APP-${year}-${randomCode}`;
+}
+
+function readApplicationValues(value: unknown): ApplicationValues {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<ApplicationValues>(
+    (values, [key, fieldValue]) => {
+      values[key] = typeof fieldValue === "string" ? fieldValue : "";
+      return values;
+    },
+    {},
+  );
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function toDate(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value) {
+    return (value as Timestamp).toDate();
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
 }

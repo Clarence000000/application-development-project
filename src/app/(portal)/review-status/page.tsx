@@ -8,15 +8,19 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
-  getDocs,
+  onSnapshot,
+  orderBy,
   query,
   where,
   type Timestamp,
 } from "firebase/firestore";
+import { deleteDraftApplicationDocument } from "@/lib/applications";
 
 interface Application {
+  documentId: string;
   id: string;
   type: string;
+  formSlug: string;
   category?: string;
   title: string;
   date: string;
@@ -32,45 +36,13 @@ interface Application {
   timeline: { title: string; date: string; desc: string; done: boolean }[];
 }
 
-const mapStatusStyles = (status: string) => {
-  switch (status) {
-    case "Approved":
-      return {
-        status: "Approved" as const,
-        statusColor: "text-green-800",
-        statusBg: "bg-green-100",
-        statusDot: "bg-green-600",
-      };
-    case "Action Required":
-      return {
-        status: "Action Required" as const,
-        statusColor: "text-on-error-container",
-        statusBg: "bg-error-container",
-        statusDot: "bg-error",
-      };
-    case "Draft":
-      return {
-        status: "Draft" as const,
-        statusColor: "text-on-surface-variant",
-        statusBg: "bg-surface-container-high",
-        statusDot: "bg-outline",
-      };
-    default: // "Pending" or "In Review"
-      return {
-        status: "In Review" as const,
-        statusColor: "text-on-secondary-container",
-        statusBg: "bg-secondary-container",
-        statusDot: "bg-on-secondary-container",
-      };
-  }
-};
-
 const mapCategory = (type: string) => {
   switch (type) {
     case "residential":
       return "Residential";
     case "income":
       return "Finance";
+    case "ic-appeal":
     case "ic_penalty":
       return "Appeal";
     default:
@@ -83,7 +55,7 @@ export default function ReviewStatusPage() {
     <Suspense
       fallback={
         <div className="py-12 text-center text-sm font-medium text-secondary">
-          Sila tunggu, memuatkan maklumat permohonan...
+          Please wait, loading application details...
         </div>
       }
     >
@@ -105,6 +77,7 @@ function ReviewStatusContent() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFocusId, setActiveFocusId] = useState<string | null>(null);
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!focusedId || isLoading || applications.length === 0) return;
@@ -129,15 +102,28 @@ function ReviewStatusContent() {
   }, [focusedId, isLoading, applications]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const querySnap = await getDocs(
-            query(
-              collection(db, "applications"),
-              where("userId", "==", user.uid),
-            ),
-          );
+    let unsubscribeApplications: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeApplications?.();
+      unsubscribeApplications = null;
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      setIsLoading(true);
+
+      const applicationsQuery = query(
+        collection(db, "applications"),
+        where("userId", "==", user.uid),
+        orderBy("updatedAt", "desc"),
+      );
+
+      unsubscribeApplications = onSnapshot(
+        applicationsQuery,
+        (querySnap) => {
           const appsList = querySnap.docs
             .map((documentSnapshot) =>
               mapFirestoreApplication(
@@ -146,20 +132,32 @@ function ReviewStatusContent() {
               ),
             )
             .sort((left, right) => right.sortTime - left.sortTime)
-            .map(({ sortTime: _sortTime, ...application }) => application);
+            .map(stripSortTime);
 
           setApplications(appsList);
-        } catch (err) {
-          console.error("Error loading application statuses: ", err);
-        } finally {
+
+          setSelectedApp((current) => {
+            if (!current) return current;
+            return (
+              appsList.find(
+                (application) => application.documentId === current.documentId,
+              ) || null
+            );
+          });
+
           setIsLoading(false);
-        }
-      } else {
-        router.push("/login");
-      }
+        },
+        (err) => {
+          console.error("Error listening to application statuses: ", err);
+          setIsLoading(false);
+        },
+      );
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeApplications?.();
+      unsubscribeAuth();
+    };
   }, [router]);
 
   const triggerToast = (msg: string) => {
@@ -168,6 +166,27 @@ function ReviewStatusContent() {
     setTimeout(() => {
       setShowToast(false);
     }, 3000);
+  };
+
+  const handleDeleteDraft = async (app: Application) => {
+    try {
+      setDeletingDraftId(app.documentId);
+      await deleteDraftApplicationDocument(app.documentId);
+      setApplications((current) =>
+        current.filter(
+          (application) => application.documentId !== app.documentId,
+        ),
+      );
+      if (selectedApp?.documentId === app.documentId) {
+        setSelectedApp(null);
+      }
+      triggerToast("Draft deleted.");
+    } catch (error) {
+      console.error("Failed to delete draft", error);
+      triggerToast("Draft could not be deleted.");
+    } finally {
+      setDeletingDraftId(null);
+    }
   };
 
   // Filter application list
@@ -266,7 +285,7 @@ function ReviewStatusContent() {
       <div className="space-y-3">
         {isLoading ? (
           <div className="text-center py-12 text-sm text-secondary font-medium">
-            Sila tunggu, memuatkan maklumat permohonan...
+            Please wait, loading application details...
           </div>
         ) : filteredApps.length > 0 ? (
           filteredApps.map((app) => (
@@ -368,15 +387,30 @@ function ReviewStatusContent() {
                   </div>
                 </div>
                 {app.status === "Draft" ? (
-                  <Link
-                    href={app.link || "/new-application"}
-                    className="bg-primary text-white font-semibold text-xs px-4 py-2 rounded-lg hover:opacity-95 active:scale-95 transition-all flex items-center gap-1"
-                  >
-                    Resume
-                    <span className="material-symbols-outlined text-[16px]">
-                      arrow_forward
-                    </span>
-                  </Link>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={deletingDraftId === app.documentId}
+                      onClick={() => handleDeleteDraft(app)}
+                      className="border border-error text-error font-semibold text-xs px-4 py-2 rounded-lg hover:bg-error-container active:scale-95 transition-all flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        delete
+                      </span>
+                      {deletingDraftId === app.documentId
+                        ? "Deleting..."
+                        : "Delete"}
+                    </button>
+                    <Link
+                      href={app.link || "/new-application"}
+                      className="bg-primary text-white font-semibold text-xs px-4 py-2 rounded-lg hover:opacity-95 active:scale-95 transition-all flex items-center gap-1"
+                    >
+                      Resume
+                      <span className="material-symbols-outlined text-[16px]">
+                        arrow_forward
+                      </span>
+                    </Link>
+                  </div>
                 ) : (
                   <div className="flex flex-wrap justify-end gap-2">
                     {app.status === "Approved" && app.downloadUrl && (
@@ -414,7 +448,7 @@ function ReviewStatusContent() {
               No applications found
             </h4>
             <p className="text-xs text-on-surface-variant mt-1 max-w-xs font-medium">
-              Tiada permohonan ditemui.
+              No applications found.
             </p>
           </div>
         )}
@@ -686,28 +720,33 @@ function mapFirestoreApplication(
 ): Application & { sortTime: number } {
   const status = mapStatus(data.status);
   const submittedAt = formatFirestoreDate(data.submittedAt);
+  const updatedAt = formatFirestoreDate(data.updatedAt);
   const approvedAt = formatFirestoreDate(data.approvedAt);
   const rejectedAt = formatFirestoreDate(data.rejectedAt);
   const submittedDate = toDate(data.submittedAt);
+  const updatedDate = toDate(data.updatedAt);
   const serialNumber = readString(data.serialNumber);
+  const formSlug = readString(data.formSlug) || readString(data.type);
   const title =
-    readString(data.formType) ||
-    readString(data.title) ||
-    "Permohonan Penghulu";
+    readString(data.formType) || readString(data.title) || "Office Application";
+  const displayDate = status === "Draft" ? updatedAt : submittedAt;
 
   return {
+    documentId: id,
     id:
       readString(data.referenceNumber) ||
       readString(data.applicationId) ||
       readString(data.id) ||
       id,
     type: title,
-    category: readString(data.formSlug) || readString(data.type),
+    formSlug,
+    category: mapCategory(formSlug),
     title,
-    date: submittedAt,
-    meta: readString(data.meta) || "Pejabat Penghulu",
+    date: displayDate,
+    meta: readString(data.district) || "Mukim",
     status,
     ...statusStyle(status),
+    link: status === "Draft" ? getApplicationHref(formSlug) : undefined,
     serialNumber: serialNumber || undefined,
     downloadUrl:
       status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
@@ -715,9 +754,18 @@ function mapFirestoreApplication(
       status === "Rejected"
         ? readString(data.rejectionReason) || "Application rejected"
         : undefined,
-    timeline: buildTimeline(status, submittedAt, approvedAt, rejectedAt),
-    sortTime: submittedDate?.getTime() || 0,
+    timeline: buildTimeline(status, displayDate, approvedAt, rejectedAt),
+    sortTime:
+      (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,
   };
+}
+
+function stripSortTime({
+  sortTime,
+  ...application
+}: Application & { sortTime: number }) {
+  void sortTime;
+  return application;
 }
 
 function buildTimeline(
@@ -736,7 +784,7 @@ function buildTimeline(
     {
       title: "Under Review",
       date: submittedAt,
-      desc: "Awaiting clerk and Penghulu validation.",
+      desc: "Awaiting clerk and office validation.",
       done: true,
     },
     {
@@ -764,7 +812,24 @@ function mapStatus(value: unknown): Application["status"] {
   if (status === "rejected") return "Rejected";
   if (status === "in review") return "In Review";
   if (status === "action required") return "Action Required";
+  if (status === "draft") return "Draft";
   return "In Review";
+}
+
+function getApplicationHref(formSlug: string) {
+  if (formSlug === "residential") {
+    return "/residential_verification";
+  }
+
+  if (formSlug === "income") {
+    return "/income_verification";
+  }
+
+  if (formSlug === "ic-appeal" || formSlug === "ic_penalty") {
+    return "/ic_penalty_appeal";
+  }
+
+  return "/new-application";
 }
 
 function statusStyle(status: Application["status"]) {

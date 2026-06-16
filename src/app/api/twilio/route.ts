@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const formattedPhone = formatToE164(phoneNumber);
 
     // Build the precise text layout you requested
-    const smsMessage = `Assalamualaikum/Salam Sejahtera ${applicantName},\n\nApplication is ${status}\n\nYour Borang ${formName} application (${id}) has been updated to ${status}.`;
+    const smsMessage = `Hello ${applicantName},\n\nApplication is ${status}\n\nYour ${formName} application (${id}) has been updated to ${status}.`;
 
     let deliveryStatus: "sent" | "failed" = "sent";
 

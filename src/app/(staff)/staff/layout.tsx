@@ -40,7 +40,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             menu
           </button>
           <span className="text-base font-bold tracking-tight text-[#002D62]">
-            Penghulu Staff Portal
+            Staff Portal
           </span>
         </div>
 

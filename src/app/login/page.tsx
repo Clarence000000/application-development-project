@@ -11,17 +11,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetSending, setIsResetSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg("");
+    setSuccessMsg("");
 
     try {
       const user = await signIn(email, password);
@@ -30,9 +29,9 @@ export default function LoginPage() {
       localStorage.setItem("userRole", user.role);
       
       router.push("/dashboard");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      switch (err.code) {
+      switch (getAuthErrorCode(err)) {
         case "auth/invalid-credential":
         case "auth/wrong-password":
           setErrorMsg("The email or password you entered is incorrect.");
@@ -44,10 +43,43 @@ export default function LoginPage() {
           setErrorMsg("Account temporarily locked due to too many failed attempts.");
           break;
         default:
-          setErrorMsg(err.message || "Failed to log in. Please try again.");
+          setErrorMsg(getAuthErrorMessage(err, "Failed to log in. Please try again."));
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendPasswordReset = async () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!email.trim()) {
+      setErrorMsg("Enter your email first, then request a password reset link.");
+      return;
+    }
+
+    setIsResetSending(true);
+    try {
+      const response = await fetch("/api/auth/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error || "Failed to send password reset link.");
+      }
+
+      setSuccessMsg("Password reset link sent. Check your email inbox.");
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMsg(
+        err instanceof Error ? err.message : getResetErrorMessage(err),
+      );
+    } finally {
+      setIsResetSending(false);
     }
   };
 
@@ -57,7 +89,7 @@ export default function LoginPage() {
       <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-white dark:bg-gray-900 border-b border-[#E2E8F0] dark:border-gray-800">
         <div className="flex items-center gap-4">
           <span className="text-lg font-bold text-[#002D62] dark:text-white tracking-tight">
-            Sistem Borang Pengesahan Penghulu
+            Certificate Validation System
           </span>
         </div>
       </header>
@@ -69,7 +101,7 @@ export default function LoginPage() {
           {/* Branding/Hero Section */}
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-8 animate-fade-in">
              <h1 className="text-4xl font-extrabold text-primary leading-tight tracking-tight">
-                Sistem Borang Pengesahan Penghulu
+                Certificate Validation System
              </h1>
           </div>
 
@@ -85,6 +117,11 @@ export default function LoginPage() {
               {errorMsg && (
                 <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm text-center font-medium">
                   {errorMsg}
+                </div>
+              )}
+              {successMsg && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-100 p-3 text-center text-sm font-medium text-green-800">
+                  {successMsg}
                 </div>
               )}
 
@@ -110,6 +147,14 @@ export default function LoginPage() {
                     <label className="block text-sm font-semibold text-on-surface" htmlFor="password">
                       Password
                     </label>
+                    <button
+                      type="button"
+                      onClick={handleSendPasswordReset}
+                      disabled={isResetSending || isLoading}
+                      className="text-xs font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isResetSending ? "Sending..." : "Forgot Password?"}
+                    </button>
                   </div>
                   <div className="relative">
                     <input
@@ -127,11 +172,25 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      <span className="material-symbols-outlined text-xl">
+                      <span className="material-symbols-outlined text-xl py-5">
                         {showPassword ? "visibility_off" : "visibility"}
                       </span>
                     </button>
                   </div>
+                </div>
+
+                {/*Remember me button*/}
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(event) => setRememberMe(event.target.checked)}
+                      className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      disabled={isLoading}
+                    />
+                    Remember me
+                  </label>
                 </div>
 
                 <button
@@ -174,4 +233,38 @@ export default function LoginPage() {
       </main>
     </div>
   );
+}
+
+function getResetErrorMessage(error: unknown) {
+  const code = getAuthErrorCode(error);
+
+  if (code === "auth/user-not-found") {
+    return "No account exists with this email address.";
+  }
+
+  if (code === "auth/invalid-email") {
+    return "Enter a valid email address.";
+  }
+
+  if (code === "auth/too-many-requests") {
+    return "Too many reset attempts. Please try again later.";
+  }
+
+  return "Failed to send password reset link. Please try again.";
+}
+
+function getAuthErrorCode(error: unknown) {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code?: unknown }).code || "");
+  }
+
+  return "";
+}
+
+function getAuthErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || fallback);
+  }
+
+  return fallback;
 }

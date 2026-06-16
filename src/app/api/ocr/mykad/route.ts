@@ -185,8 +185,8 @@ export async function POST(request: Request) {
   }
 
   // 4. Derive Religion and Citizenship
-  const derivedReligion = textUpper.includes("ISLAM") ? "Islam" : "Lain-lain";
-  const derivedCitizenship = textUpper.includes("WARGANEGARA") ? "Warganegara" : "Bukan Warganegara";
+  const derivedReligion = textUpper.includes("ISLAM") ? "Islam" : "Others";
+  const derivedCitizenship = textUpper.includes("WARGANEGARA") ? "Citizen" : "Non-citizen";
 
   return NextResponse.json({
     success: true,

@@ -143,7 +143,7 @@ export default function RegisterPage() {
       <header className="fixed top-0 left-0 w-full h-14 flex items-center justify-between px-6 z-50 bg-white border-b border-[#E2E8F0]">
         <div className="flex items-center gap-3">
           <span className="text-base font-bold text-[#002D62] tracking-tight">
-            Sistem Borang Pengesahan Penghulu
+            Certificate Validation System
           </span>
         </div>
       </header>
@@ -155,7 +155,7 @@ export default function RegisterPage() {
           {/* Left Section */}
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-6">
              <h1 className="text-3xl font-bold leading-tight tracking-tight text-primary">
-                Sistem Borang Pengesahan Penghulu
+                Certificate Validation System
              </h1>
           </div>
 

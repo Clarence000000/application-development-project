@@ -1,5 +1,9 @@
 export const districtOptions = [
-  { label: "Mukim Ayer Hitam", value: "Mukim Ayer Hitam" },
-  { label: "Mukim Parit Raja", value: "Mukim Parit Raja" },
-  { label: "Mukim Sri Gading", value: "Mukim Sri Gading" },
+  { label: "Kluang", value: "Kluang" },
+  { label: "Machap", value: "Machap" },
+  { label: "Ulu Benut", value: "Ulu Benut" },
+  { label: "Kahang", value: "Kahang" },
+  { label: "Paloh", value: "Paloh" },
+  { label: "Layang-Layang", value: "Layang-Layang" },
+  { label: "Niyor", value: "Niyor" },
 ];
