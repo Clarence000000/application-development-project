@@ -34,7 +34,7 @@ type ApplicationRecord = {
   idNumber: string;
   formName: string;
   submittedDate: string;
-  mukim: string;
+  district: string;
   status: ApprovalStatus;
   purpose: string;
   address: string;
@@ -182,16 +182,7 @@ export default function ApprovalReviewPage() {
     (application) => application.documentId === selectedId,
   );
 
-  const assignedApplications = useMemo(
-    () =>
-      applications.filter(
-        (application) =>
-          application.mukim
-            .toLowerCase()
-            .includes(staffDistrict.toLowerCase()),
-      ),
-    [applications, staffDistrict],
-  );
+  const assignedApplications = useMemo(() => applications, [applications]);
 
   const filteredApplications = useMemo(() => {
     return assignedApplications.filter((application) => {
@@ -422,7 +413,7 @@ export default function ApprovalReviewPage() {
                 <th className="px-4 py-3">Application</th>
                 <th className="px-4 py-3">Applicant</th>
                 <th className="px-4 py-3">Form</th>
-                <th className="px-4 py-3">Mukim</th>
+                <th className="px-4 py-3">district</th>
                 <th className="px-4 py-3">Submitted</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-center">Action</th>
@@ -455,7 +446,7 @@ export default function ApprovalReviewPage() {
                       {application.formName}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-on-surface">
-                      {application.mukim}
+                      {application.district}
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-on-surface-variant">
                       {application.submittedDate}
@@ -513,7 +504,7 @@ export default function ApprovalReviewPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">location_on</span>
-                        {application.mukim}
+                        {application.district}
                       </span>
                     </div>
                   </div>
@@ -581,7 +572,7 @@ export default function ApprovalReviewPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={selectedApplication.status} />
                   <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-bold text-on-surface-variant">
-                    {selectedApplication.mukim}
+                    {selectedApplication.district}
                   </span>
                 </div>
               </div>
@@ -597,7 +588,7 @@ export default function ApprovalReviewPage() {
                     <DetailItem label="IC Number" value={selectedApplication.idNumber} />
                     <DetailItem label="Phone Number" value={selectedApplication.phoneNumber} />
                     <DetailItem label="Email" value={selectedApplication.emailAddress} />
-                    <DetailItem label="Mukim" value={selectedApplication.mukim} />
+                    <DetailItem label="District" value={selectedApplication.district} />
                     <DetailItem label="Submitted Date" value={selectedApplication.submittedDate} />
                   </div>
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -894,8 +885,8 @@ function mapApplicationRecord(
       readString(application.formType, application.title) ||
       "Office Application",
     submittedDate,
-    mukim:
-      readString(application.district, application.mukim, application.meta) ||
+    district:
+      readString(application.district, application.district, application.meta) ||
       currentStaff.assignedDistrict,
     status,
     purpose: readString(values.purpose, values.appealReason) || "-",

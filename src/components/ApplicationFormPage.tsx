@@ -18,7 +18,7 @@ import {
 } from "@/lib/notifications";
 import { useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; 
+import { db } from "@/lib/firebase";
 import { districtOptions } from "@/lib/districts";
 
 type FormValues = Record<string, string>;
@@ -29,14 +29,19 @@ type ApplicationFormPageProps = {
   config: ApplicationFormConfig;
 };
 
-export default function ApplicationFormPage({ config }: ApplicationFormPageProps) {
+export default function ApplicationFormPage({
+  config,
+}: ApplicationFormPageProps) {
   const router = useRouter();
-  
+
   const initialValues = useMemo(() => {
-    return config.fields.reduce<FormValues>((values, field) => {
-      values[field.name] = "";
-      return values;
-    }, { district: "" });
+    return config.fields.reduce<FormValues>(
+      (values, field) => {
+        values[field.name] = "";
+        return values;
+      },
+      { district: "" },
+    );
   }, [config.fields]);
 
   const [values, setValues] = useState<FormValues>(initialValues);
@@ -46,8 +51,11 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isManualSaving, setIsManualSaving] = useState(false);
   const [isDeletingDraft, setIsDeletingDraft] = useState(false);
-  const [draftSaveStatus, setDraftSaveStatus] = useState<DraftSaveStatus>("idle");
-  const [draftApplicationId, setDraftApplicationId] = useState<string | undefined>();
+  const [draftSaveStatus, setDraftSaveStatus] =
+    useState<DraftSaveStatus>("idle");
+  const [draftApplicationId, setDraftApplicationId] = useState<
+    string | undefined
+  >();
   const [submittedReferenceNumber, setSubmittedReferenceNumber] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const hasLoadedInitialData = useRef(false);
@@ -79,56 +87,65 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           const userData = userSnapshot.data();
           const updatedValues = { ...initialValues };
 
-            // 1. Map 'name'
-            if (userData.name && "name" in updatedValues) {
-              updatedValues.name = userData.name;
+          // 1. Map 'name'
+          if (userData.name && "name" in updatedValues) {
+            updatedValues.name = userData.name;
+          }
+
+          // 2. Map 'icNumber' -> 'idNumber'
+          if (userData.icNumber && "idNumber" in updatedValues) {
+            updatedValues.idNumber = userData.icNumber;
+          }
+
+          // 3. Map 'addressIC' -> 'icAddress'
+          if (userData.addressIC && "icAddress" in updatedValues) {
+            updatedValues.icAddress = userData.addressIC;
+          }
+
+          if (
+            (userData.addressCurrent || userData.addressIC) &&
+            "residentialAddress" in updatedValues
+          ) {
+            updatedValues.residentialAddress =
+              userData.addressCurrent || userData.addressIC;
+          }
+
+          // 4. Map 'citizenship' -> Normalizes "Warganegara" string to form value slug "warganegara"
+          if (userData.citizenship && "citizenship" in updatedValues) {
+            const normalizedCitizenship = userData.citizenship
+              .toLowerCase()
+              .trim();
+            if (
+              normalizedCitizenship === "warganegara" ||
+              normalizedCitizenship === "citizen"
+            ) {
+              updatedValues.citizenship = "warganegara";
             }
 
-            // 2. Map 'icNumber' -> 'idNumber'
-            if (userData.icNumber && "idNumber" in updatedValues) {
-              updatedValues.idNumber = userData.icNumber;
+            if (
+              normalizedCitizenship === "bukan warganegara" ||
+              normalizedCitizenship === "bukan-warganegara" ||
+              normalizedCitizenship === "non-citizen"
+            ) {
+              updatedValues.citizenship = "bukan-warganegara";
             }
+          }
 
-            // 3. Map 'addressIC' -> 'icAddress'
-            if (userData.addressIC && "icAddress" in updatedValues) {
-              updatedValues.icAddress = userData.addressIC;
-            }
+          // 5. Map 'phoneNumber' -> Safely auto-fills phone number if the current form configuration uses it
+          if (userData.phoneNumber && "phoneNumber" in updatedValues) {
+            updatedValues.phoneNumber = userData.phoneNumber;
+          }
 
-            if ((userData.addressCurrent || userData.addressIC) && "residentialAddress" in updatedValues) {
-              updatedValues.residentialAddress = userData.addressCurrent || userData.addressIC;
-            }
+          if (userData.occupation && "occupation" in updatedValues) {
+            updatedValues.occupation = userData.occupation;
+          }
 
-            // 4. Map 'citizenship' -> Normalizes "Warganegara" string to form value slug "warganegara"
-            if (userData.citizenship && "citizenship" in updatedValues) {
-              const normalizedCitizenship = userData.citizenship.toLowerCase().trim();
-              if (
-                normalizedCitizenship === "warganegara" ||
-                normalizedCitizenship === "citizen"
-              ) {
-                updatedValues.citizenship = "warganegara";
-              }
-
-              if (
-                normalizedCitizenship === "bukan warganegara" ||
-                normalizedCitizenship === "bukan-warganegara" ||
-                normalizedCitizenship === "non-citizen"
-              ) {
-                updatedValues.citizenship = "bukan-warganegara";
-              }
-            }
-
-            // 5. Map 'phoneNumber' -> Safely auto-fills phone number if the current form configuration uses it
-            if (userData.phoneNumber && "phoneNumber" in updatedValues) {
-              updatedValues.phoneNumber = userData.phoneNumber;
-            }
-
-            if (userData.occupation && "occupation" in updatedValues) {
-              updatedValues.occupation = userData.occupation;
-            }
-
-            if (userData.monthlyIncome !== undefined && "income" in updatedValues) {
-              updatedValues.income = String(userData.monthlyIncome);
-            }
+          if (
+            userData.monthlyIncome !== undefined &&
+            "income" in updatedValues
+          ) {
+            updatedValues.income = String(userData.monthlyIncome);
+          }
 
           profileValues = updatedValues;
         }
@@ -143,7 +160,8 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           ...profileValues,
           ...(latestDraft?.values || {}),
         };
-        const loadedDeclarationAccepted = latestDraft?.declarationAccepted || false;
+        const loadedDeclarationAccepted =
+          latestDraft?.declarationAccepted || false;
 
         setValues(loadedValues);
         setDeclarationAccepted(loadedDeclarationAccepted);
@@ -166,7 +184,6 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       } finally {
         hasLoadedInitialData.current = true;
       }
-
     });
 
     return () => unsubscribe();
@@ -174,10 +191,25 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
 
   function updateValue(name: string, value: string) {
     hasUserEdited.current = true;
-    setValues((current) => ({ ...current, [name]: value }));
+
+    setValues((current) => {
+      const nextValues = { ...current, [name]: value };
+
+      if (name === "residentialStatus" && value !== "lain-lain") {
+        nextValues.otherResidentialStatus = "";
+      }
+
+      return nextValues;
+    });
+
     setErrors((current) => {
       const next = { ...current };
       delete next[name];
+
+      if (name === "residentialStatus" && value !== "lain-lain") {
+        delete next.otherResidentialStatus;
+      }
+
       return next;
     });
   }
@@ -255,7 +287,11 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
   }
 
   useEffect(() => {
-    if (!hasLoadedInitialData.current || !hasUserEdited.current || showSuccess) {
+    if (
+      !hasLoadedInitialData.current ||
+      !hasUserEdited.current ||
+      showSuccess
+    ) {
       return;
     }
 
@@ -278,7 +314,8 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       }
 
       if (field.name === "idNumber" && value && !isValidIdNumber(value)) {
-        nextErrors[field.name] = "Enter a valid identity card or passport number.";
+        nextErrors[field.name] =
+          "Enter a valid identity card or passport number.";
       }
 
       if (field.type === "number" && value && Number(value) < 0) {
@@ -290,12 +327,17 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
       nextErrors.district = "Please select an application district.";
     }
 
-    if (values.residentialStatus === "lain-lain" && !values.otherResidentialStatus?.trim()) {
-      nextErrors.otherResidentialStatus = "Please specify your residence status.";
+    if (
+      values.residentialStatus === "lain-lain" &&
+      !values.otherResidentialStatus?.trim()
+    ) {
+      nextErrors.otherResidentialStatus =
+        "Please specify your residence status.";
     }
 
     if (!declarationAccepted) {
-      nextErrors.declaration = "Please confirm the declaration before submitting your application.";
+      nextErrors.declaration =
+        "Please confirm the declaration before submitting your application.";
     }
 
     return nextErrors;
@@ -365,7 +407,7 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           status: "In Review",
           values,
           submittedAt: new Date().toISOString(),
-        })
+        }),
       );
       setSubmittedReferenceNumber(submittedApplication.referenceNumber);
       setShowSuccess(true);
@@ -387,7 +429,9 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
           <Link href="/new-application" className="hover:text-primary">
             Applications
           </Link>
-          <span className="material-symbols-outlined text-sm">chevron_right</span>
+          <span className="material-symbols-outlined text-sm">
+            chevron_right
+          </span>
           <span className="text-primary">{config.shortTitle}</span>
         </nav>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -413,29 +457,46 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
                 Estimated Time
               </p>
-              <p className="mt-1 font-bold text-primary">{config.estimatedTime}</p>
+              <p className="mt-1 font-bold text-primary">
+                {config.estimatedTime}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 border border-outline-variant bg-white md:grid-cols-3">
-        <ProcessStep title="Step 1" description="Complete the application details." />
-        <ProcessStep title="Step 2" description="The office reviews your application." />
-        <ProcessStep title="Step 3" description="You receive the next instructions." />
+        <ProcessStep
+          title="Step 1"
+          description="Complete the application details."
+        />
+        <ProcessStep
+          title="Step 2"
+          description="The office reviews your application."
+        />
+        <ProcessStep
+          title="Step 3"
+          description="You receive the next instructions."
+        />
       </section>
 
       {Object.keys(errors).length > 0 && (
         <div className="border-l-4 border-error bg-error-container px-4 py-3 text-on-error-container">
-          <p className="text-sm font-bold">Please review your application details.</p>
+          <p className="text-sm font-bold">
+            Please review your application details.
+          </p>
           <p className="mt-1 text-xs">
-            {errors.form || "Complete all marked fields before submitting your application."}
+            {errors.form ||
+              "Complete all marked fields before submitting your application."}
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <form onSubmit={handleSubmit} className="border border-outline-variant bg-white">
+        <form
+          onSubmit={handleSubmit}
+          className="border border-outline-variant bg-white"
+        >
           <section className="border-b border-outline-variant p-5 md:p-6">
             <SectionTitle icon="person" title="Applicant Details" />
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -450,7 +511,9 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
                   id="district"
                   name="district"
                   value={values.district}
-                  onChange={(event) => updateValue("district", event.target.value)}
+                  onChange={(event) =>
+                    updateValue("district", event.target.value)
+                  }
                   className={fieldClassName(errors.district)}
                 >
                   <option value="">Select application district</option>
@@ -461,67 +524,106 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Your application will be routed to the staff assigned to this area.
+                  Your application will be routed to the staff assigned to this
+                  area.
                 </p>
                 {errors.district && (
-                  <p className="mt-1 text-xs font-semibold text-error">{errors.district}</p>
+                  <p className="mt-1 text-xs font-semibold text-error">
+                    {errors.district}
+                  </p>
                 )}
               </div>
-              {config.fields.map((field) => (
-                <div className={field.fullWidth ? "md:col-span-2" : ""} key={field.name}>
-                  <label
-                    className="mb-1.5 block text-sm font-bold text-on-surface"
-                    htmlFor={field.name}
+              {config.fields.map((field) => {
+                const isOtherResidentialStatusField =
+                  field.name === "otherResidentialStatus";
+
+                const isFieldDisabled =
+                  isOtherResidentialStatusField &&
+                  values.residentialStatus !== "lain-lain";
+
+                return (
+                  <div
+                    className={field.fullWidth ? "md:col-span-2" : ""}
+                    key={field.name}
                   >
-                    {field.label}
-                    {field.required && <span className="text-error"> *</span>}
-                  </label>
-                  {field.type === "select" ? (
-                    <select
-                      id={field.name}
-                      name={field.name}
-                      value={values[field.name]}
-                      onChange={(event) => updateValue(field.name, event.target.value)}
-                      className={fieldClassName(errors[field.name])}
+                    <label
+                      className="mb-1.5 block text-sm font-bold text-on-surface"
+                      htmlFor={field.name}
                     >
-                      <option value="">Select one</option>
-                      {field.options?.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : field.type === "textarea" ? (
-                    <textarea
-                      id={field.name}
-                      name={field.name}
-                      rows={4}
-                      value={values[field.name]}
-                      placeholder={field.placeholder}
-                      onChange={(event) => updateValue(field.name, event.target.value)}
-                      className={`${fieldClassName(errors[field.name])} min-h-28 resize-y`}
-                    />
-                  ) : (
-                    <input
-                      id={field.name}
-                      name={field.name}
-                      type={field.type}
-                      min={field.type === "number" ? "0" : undefined}
-                      step={field.name.toLowerCase().includes("amount") || field.name === "income" ? "0.01" : undefined}
-                      value={values[field.name]}
-                      placeholder={field.placeholder}
-                      onChange={(event) => updateValue(field.name, event.target.value)}
-                      className={fieldClassName(errors[field.name])}
-                    />
-                  )}
-                  {field.helperText && (
-                    <p className="mt-1 text-xs text-on-surface-variant">{field.helperText}</p>
-                  )}
-                  {errors[field.name] && (
-                    <p className="mt-1 text-xs font-semibold text-error">{errors[field.name]}</p>
-                  )}
-                </div>
-              ))}
+                      {field.label}
+                      {field.required && <span className="text-error"> *</span>}
+                    </label>
+                    {field.type === "select" ? (
+                      <select
+                        id={field.name}
+                        name={field.name}
+                        value={values[field.name]}
+                        disabled={isFieldDisabled}
+                        onChange={(event) =>
+                          updateValue(field.name, event.target.value)
+                        }
+                        className={fieldClassName(
+                          errors[field.name],
+                          isFieldDisabled,
+                        )}
+                      >
+                        <option value="">Select one</option>
+                        {field.options?.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : field.type === "textarea" ? (
+                      <textarea
+                        id={field.name}
+                        name={field.name}
+                        rows={4}
+                        value={values[field.name]}
+                        placeholder={field.placeholder}
+                        disabled={isFieldDisabled}
+                        onChange={(event) =>
+                          updateValue(field.name, event.target.value)
+                        }
+                        className={`${fieldClassName(errors[field.name], isFieldDisabled)} min-h-28 resize-y`}
+                      />
+                    ) : (
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type={field.type}
+                        disabled={isFieldDisabled}
+                        min={field.type === "number" ? "0" : undefined}
+                        step={
+                          field.name.toLowerCase().includes("amount") ||
+                          field.name === "income"
+                            ? "0.01"
+                            : undefined
+                        }
+                        value={values[field.name]}
+                        placeholder={field.placeholder}
+                        onChange={(event) =>
+                          updateValue(field.name, event.target.value)
+                        }
+                        className={fieldClassName(
+                          errors[field.name],
+                          isFieldDisabled,
+                        )}
+                      />
+                    )}
+                    {field.helperText && (
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {field.helperText}
+                      </p>
+                    )}
+                    {errors[field.name] && (
+                      <p className="mt-1 text-xs font-semibold text-error">
+                        {errors[field.name]}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -543,12 +645,14 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
                 className="mt-1 h-4 w-4 accent-primary"
               />
               <span>
-                I declare that the information provided is true and that I am fully
-                responsible for the details in this application.
+                I declare that the information provided is true and that I am
+                fully responsible for the details in this application.
               </span>
             </label>
             {errors.declaration && (
-              <p className="mt-2 text-xs font-semibold text-error">{errors.declaration}</p>
+              <p className="mt-2 text-xs font-semibold text-error">
+                {errors.declaration}
+              </p>
             )}
 
             <div className="mt-6 flex flex-col gap-3 border-t border-outline-variant pt-5 sm:flex-row sm:justify-end">
@@ -607,30 +711,40 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
 
         <aside className="space-y-4">
           <div className="border-t-4 border-primary bg-white p-5 shadow-sm">
-            <h2 className="text-base font-bold text-primary">Process Information</h2>
+            <h2 className="text-base font-bold text-primary">
+              Process Information
+            </h2>
             <ul className="mt-4 space-y-4 text-sm leading-6 text-on-surface-variant">
               <li>
-                <strong className="block text-on-surface">Supporting documents</strong>
-                Supporting documents may be requested after office review, together with
-                appointment details or next instructions.
+                <strong className="block text-on-surface">
+                  Supporting documents
+                </strong>
+                Supporting documents may be requested after office review,
+                together with appointment details or next instructions.
               </li>
               <li>
-                <strong className="block text-on-surface">Office section</strong>
-                Comments, signature, date, name, and official stamp are completed by the
-                office, not by the applicant.
+                <strong className="block text-on-surface">
+                  Office section
+                </strong>
+                Comments, signature, date, name, and official stamp are
+                completed by the office, not by the applicant.
               </li>
               <li>
-                <strong className="block text-on-surface">Application status</strong>
+                <strong className="block text-on-surface">
+                  Application status
+                </strong>
                 Submitted applications are recorded for initial review.
               </li>
             </ul>
           </div>
           <div className="border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
             <div className="flex gap-2">
-              <span className="material-symbols-outlined text-primary">info</span>
+              <span className="material-symbols-outlined text-primary">
+                info
+              </span>
               <p>
-                Make sure your information is accurate. Incomplete details may delay
-                the office review.
+                Make sure your information is accurate. Incomplete details may
+                delay the office review.
               </p>
             </div>
           </div>
@@ -643,10 +757,12 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
               <span className="material-symbols-outlined">check</span>
             </div>
-            <h2 className="mt-4 text-xl font-bold text-primary">Application Submitted Successfully</h2>
+            <h2 className="mt-4 text-xl font-bold text-primary">
+              Application Submitted Successfully
+            </h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Your application details have been recorded. Please check your application
-              status for further updates.
+              Your application details have been recorded. Please check your
+              application status for further updates.
             </p>
             {submittedReferenceNumber && (
               <p className="mt-3 text-xs font-bold text-primary">
@@ -676,10 +792,18 @@ export default function ApplicationFormPage({ config }: ApplicationFormPageProps
   );
 }
 
-function ProcessStep({ title, description }: { title: string; description: string }) {
+function ProcessStep({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="border-b border-outline-variant p-4 md:border-b-0 md:border-r last:border-r-0">
-      <p className="text-xs font-bold uppercase tracking-wide text-primary">{title}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-primary">
+        {title}
+      </p>
       <p className="mt-1 text-sm text-on-surface-variant">{description}</p>
     </div>
   );
@@ -694,9 +818,15 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-function fieldClassName(hasError?: string) {
-  return `w-full border bg-white px-3 py-2.5 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${
-    hasError ? "border-error" : "border-outline"
+function fieldClassName(error?: string, disabled = false) {
+  return `w-full rounded-lg border px-3 py-2 text-sm outline-none transition ${
+    error
+      ? "border-error focus:border-error focus:ring-1 focus:ring-error"
+      : "border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary"
+  } ${
+    disabled
+      ? "bg-gray-100 text-on-surface-variant cursor-not-allowed opacity-70"
+      : "bg-white"
   }`;
 }
 

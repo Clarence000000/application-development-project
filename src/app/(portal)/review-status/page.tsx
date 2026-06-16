@@ -8,7 +8,8 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
-  getDocs,
+  onSnapshot,
+  orderBy,
   query,
   where,
   type Timestamp,
@@ -101,15 +102,28 @@ function ReviewStatusContent() {
   }, [focusedId, isLoading, applications]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const querySnap = await getDocs(
-            query(
-              collection(db, "applications"),
-              where("userId", "==", user.uid),
-            ),
-          );
+    let unsubscribeApplications: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeApplications?.();
+      unsubscribeApplications = null;
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      setIsLoading(true);
+
+      const applicationsQuery = query(
+        collection(db, "applications"),
+        where("userId", "==", user.uid),
+        orderBy("updatedAt", "desc"),
+      );
+
+      unsubscribeApplications = onSnapshot(
+        applicationsQuery,
+        (querySnap) => {
           const appsList = querySnap.docs
             .map((documentSnapshot) =>
               mapFirestoreApplication(
@@ -121,17 +135,29 @@ function ReviewStatusContent() {
             .map(stripSortTime);
 
           setApplications(appsList);
-        } catch (err) {
-          console.error("Error loading application statuses: ", err);
-        } finally {
+
+          setSelectedApp((current) => {
+            if (!current) return current;
+            return (
+              appsList.find(
+                (application) => application.documentId === current.documentId,
+              ) || null
+            );
+          });
+
           setIsLoading(false);
-        }
-      } else {
-        router.push("/login");
-      }
+        },
+        (err) => {
+          console.error("Error listening to application statuses: ", err);
+          setIsLoading(false);
+        },
+      );
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeApplications?.();
+      unsubscribeAuth();
+    };
   }, [router]);
 
   const triggerToast = (msg: string) => {
@@ -147,7 +173,9 @@ function ReviewStatusContent() {
       setDeletingDraftId(app.documentId);
       await deleteDraftApplicationDocument(app.documentId);
       setApplications((current) =>
-        current.filter((application) => application.documentId !== app.documentId),
+        current.filter(
+          (application) => application.documentId !== app.documentId,
+        ),
       );
       if (selectedApp?.documentId === app.documentId) {
         setSelectedApp(null);
@@ -369,7 +397,9 @@ function ReviewStatusContent() {
                       <span className="material-symbols-outlined text-[16px]">
                         delete
                       </span>
-                      {deletingDraftId === app.documentId ? "Deleting..." : "Delete"}
+                      {deletingDraftId === app.documentId
+                        ? "Deleting..."
+                        : "Delete"}
                     </button>
                     <Link
                       href={app.link || "/new-application"}
@@ -698,9 +728,7 @@ function mapFirestoreApplication(
   const serialNumber = readString(data.serialNumber);
   const formSlug = readString(data.formSlug) || readString(data.type);
   const title =
-    readString(data.formType) ||
-    readString(data.title) ||
-    "Office Application";
+    readString(data.formType) || readString(data.title) || "Office Application";
   const displayDate = status === "Draft" ? updatedAt : submittedAt;
 
   return {
@@ -715,7 +743,7 @@ function mapFirestoreApplication(
     category: mapCategory(formSlug),
     title,
     date: displayDate,
-    meta: readString(data.meta) || "Office",
+    meta: readString(data.district) || "Mukim",
     status,
     ...statusStyle(status),
     link: status === "Draft" ? getApplicationHref(formSlug) : undefined,
@@ -727,7 +755,8 @@ function mapFirestoreApplication(
         ? readString(data.rejectionReason) || "Application rejected"
         : undefined,
     timeline: buildTimeline(status, displayDate, approvedAt, rejectedAt),
-    sortTime: (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,
+    sortTime:
+      (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,
   };
 }
 

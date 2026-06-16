@@ -195,15 +195,26 @@ function mapApplicant(
 }
 
 function normalizeFormType(value: unknown): CertificateFormType | null {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("bermastautin")) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+
+  if (
+    normalized.includes("residential") ||
+    normalized.includes("bermastautin") ||
+    normalized.includes("mastautin")
+  ) {
     return "mastautin";
   }
+
   if (normalized.includes("income") || normalized.includes("pendapatan")) {
     return "income";
   }
+
   if (
-    normalized.includes("ic") ||
+    normalized.includes("ic-appeal") ||
+    normalized.includes("ic-penalty") ||
+    normalized.includes("identity-card") ||
     normalized.includes("rayuan") ||
     normalized.includes("denda")
   ) {

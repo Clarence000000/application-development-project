@@ -34,7 +34,6 @@ export type FirestoreApplication = {
   title: string;
   status: ApplicationStatus;
   district: string;
-  mukim: string;
   submittedAt: Timestamp | FieldValue | null;
   updatedAt: Timestamp | FieldValue;
   values: ApplicationValues;
@@ -86,7 +85,6 @@ export async function createApplicationDocument({
     title: config.title,
     status: "In Review",
     district,
-    mukim: district,
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     values,
@@ -169,13 +167,12 @@ export async function saveDraftApplicationDocument({
       title: config.title,
       status: "Draft",
       district,
-      mukim: district,
       submittedAt: null,
       updatedAt: serverTimestamp(),
       draftSavedAt: serverTimestamp(),
       values,
       declarationAccepted,
-      meta: district ? `Office ${district}` : "Office",
+      meta: district ? `Mukim ${district}` : "None",
       serialNumber: null,
       approvedAt: null,
       approvedBy: null,
