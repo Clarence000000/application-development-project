@@ -93,7 +93,6 @@ export default function PortalLayout({
   };
 
   const handleSettings = (e: React.MouseEvent) => {
-    e.preventDefault();
     router.push("/settings");
   };
 
@@ -128,7 +127,7 @@ export default function PortalLayout({
             menu
           </button>
           <span className="text-base font-bold text-[#002D62] dark:text-white tracking-tight">
-            Pelbagai Perakuan Penghulu System
+            MyPerakuan
           </span>
         </div>
 

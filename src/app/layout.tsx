@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pelbagai Perakuan Penghulu System",
+  title: "MyPerakuan",
   description: "Official sub-district verification and document portal.",
 };
 
