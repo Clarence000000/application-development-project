@@ -20,14 +20,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = (event: React.MouseEvent) => {
     event.preventDefault();
-    router.push("/staff/login");
+    router.push("/login");
   };
-
-  const isAuthPage = pathname === "/staff/login" || pathname === "/staff/register";
-
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
 
   return (
     <div className="min-h-screen bg-background text-on-background">

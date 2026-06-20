@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "../../lib/user_auth"; 
+import { signIn, signInWithStaffId } from "../../lib/user_auth"; 
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,15 +20,24 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg("");
-    setSuccessMsg("");
 
     try {
-      const user = await signIn(email, password);
+      const isEmail = email.includes("@");
+      let user;
+      if (isEmail) {
+        user = await signIn(email, password);
+      } else {
+        user = await signInWithStaffId(email, password);
+      }
       
       console.log("Logged in successfully as:", user.role);
       localStorage.setItem("userRole", user.role);
       
-      router.push("/dashboard");
+      if (user.role === "Admin" || user.role === "SuperAdmin") {
+        router.push("/staff/approval-review");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err: unknown) {
       console.error(err);
       switch (getAuthErrorCode(err)) {
@@ -128,13 +137,13 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-on-surface" htmlFor="id-user">
-                    Email
+                    Email / Staff ID
                   </label>
                   <input
                     className="w-full px-4 py-2.5 bg-white border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
                     id="id-user"
-                    placeholder="Enter your email"
-                    type="email"
+                    placeholder="Enter email or Staff ID"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
