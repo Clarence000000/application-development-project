@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  doc,
-  getDoc,
-  runTransaction,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 import { generateSecureApplicationSerial } from "@/lib/serialGenerator";
 import {
   generateApplicationCertificatePdf,
@@ -21,6 +16,7 @@ type RouteContext = {
 };
 
 export const runtime = "nodejs";
+const adminDb = getAdminDb();
 
 export async function GET(_request: Request, context: RouteContext) {
   const { applicationId } = await context.params;
@@ -55,21 +51,21 @@ async function findApprovedCertificateDataFromFirestore(
   applicationId: string,
 ): Promise<CertificatePdfData | null> {
   try {
-    const applicationSnapshot = await getDoc(
-      doc(db, "applications", applicationId),
-    );
-    if (!applicationSnapshot.exists()) {
+    const applicationSnapshot = await adminDb
+      .doc(`applications/${applicationId}`)
+      .get();
+    if (!applicationSnapshot.exists) {
       return null;
     }
 
-    const application = applicationSnapshot.data();
+    const application = applicationSnapshot.data() || {};
     if (String(application.status || "").toLowerCase() !== "approved") {
       return null;
     }
 
     const uid = String(application.uid || "");
-    const userSnapshot = uid ? await getDoc(doc(db, "users", uid)) : null;
-    const user = userSnapshot?.exists() ? userSnapshot.data() : {};
+    const userSnapshot = uid ? await adminDb.doc(`users/${uid}`).get() : null;
+    const user = userSnapshot?.exists ? userSnapshot.data() || {} : {};
     const values = (application.values || application.formData || {}) as Record<
       string,
       unknown
@@ -134,12 +130,13 @@ async function getOrCreateSerialNumber(
     return existingSerialNumber;
   }
 
-  return runTransaction(db, async (transaction) => {
-    const counterRef = doc(db, "counters", "documentSerial");
-    const applicationRef = doc(db, "applications", applicationId);
+  return adminDb.runTransaction(async (transaction) => {
+    const counterRef = adminDb.doc("counters/documentSerial");
+    const applicationRef = adminDb.doc(`applications/${applicationId}`);
     const counterSnapshot = await transaction.get(counterRef);
-    const lastIncrementalId = counterSnapshot.exists()
-      ? Number(counterSnapshot.data().lastNumber || 0)
+    const counterData = counterSnapshot.data() || {};
+    const lastIncrementalId = counterSnapshot.exists
+      ? Number(counterData.lastNumber || 0)
       : 0;
     const nextIncrementalId = lastIncrementalId + 1;
     const serialNumber = generateSecureApplicationSerial(
@@ -152,7 +149,7 @@ async function getOrCreateSerialNumber(
       counterRef,
       {
         lastNumber: nextIncrementalId,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
