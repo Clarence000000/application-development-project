@@ -2,11 +2,14 @@ import { auth, db } from "./firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, type FieldValue } from "firebase/firestore";
 
+export const SUPERADMIN_EMAIL = "penghulusystem@gmail.com";
+export type UserRole = "Applicant" | "Admin" | "SuperAdmin";
+
 export interface UserProfile {
   uid: string;
   
   email: string;
-  role: "Applicant" | "Admin" | "SuperAdmin";
+  role: UserRole;
   createdAt: FieldValue;
   
   // Auto-filled via MyKad OCR Scan
@@ -32,6 +35,21 @@ export interface UserProfile {
 
 export type RegistrationPayload = Omit<UserProfile, "uid" | "role" | "createdAt" | "email">;
 
+function getRoleForEmail(email: string, role: UserRole): UserRole {
+  return email.trim().toLowerCase() === SUPERADMIN_EMAIL ? "SuperAdmin" : role;
+}
+
+function isSuperAdminEmail(email: string) {
+  return email.trim().toLowerCase() === SUPERADMIN_EMAIL;
+}
+
+function normalizeUserProfile(profile: UserProfile): UserProfile {
+  return {
+    ...profile,
+    role: getRoleForEmail(profile.email, profile.role),
+  };
+}
+
 export const signIn = async (email: string, password: string): Promise<UserProfile> => {
   // 1. Authenticate via Firebase
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -40,16 +58,39 @@ export const signIn = async (email: string, password: string): Promise<UserProfi
   // 2. Fetch the profile from Firestore
   const userDocRef = doc(db, "users", firebaseUser.uid);
   const userDocSnap = await getDoc(userDocRef);
+  const resolvedEmail = firebaseUser.email || email;
 
   if (!userDocSnap.exists()) {
+    if (isSuperAdminEmail(resolvedEmail)) {
+      const superAdminProfile: UserProfile = {
+        uid: firebaseUser.uid,
+        email: resolvedEmail,
+        role: "SuperAdmin",
+        createdAt: serverTimestamp(),
+        name: "Penghulu System Superadmin",
+        staffId: "SUPERADMIN",
+        department: "Penghulu Office",
+        district: "All Mukims",
+      };
+
+      await setDoc(userDocRef, superAdminProfile);
+      return superAdminProfile;
+    }
+
     throw new Error("User account records not found in the system database.");
   }
 
   // 3. Return the fully typed schema
-  return {
+  const profile = normalizeUserProfile({
     uid: firebaseUser.uid,
     ...(userDocSnap.data() as Omit<UserProfile, "uid">)
-  };
+  });
+
+  if (profile.role === "SuperAdmin" && userDocSnap.data().role !== "SuperAdmin") {
+    await setDoc(userDocRef, { role: "SuperAdmin" }, { merge: true });
+  }
+
+  return profile;
 };
 
 export const registerAccount = async (
@@ -66,7 +107,7 @@ export const registerAccount = async (
   const newUserProfile: UserProfile = {
     uid: firebaseUser.uid,
     email: email,
-    role: "Applicant",
+    role: getRoleForEmail(email, "Applicant"),
     createdAt: serverTimestamp(),
     
     ...profileData, 
@@ -81,7 +122,7 @@ export const registerAccount = async (
 export const registerStaffAccount = async (
   email: string,
   password: string,
-  profileData: { name: string; staffId: string; department: string; district: string; }
+  profileData: { name: string; staffId: string; department: string; district: string; role?: UserRole; }
 ): Promise<UserProfile> => {
   // 1. Create the base authentication credentials
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -91,7 +132,7 @@ export const registerStaffAccount = async (
   const newUserProfile: UserProfile = {
     uid: firebaseUser.uid,
     email: email,
-    role: "Admin",
+    role: getRoleForEmail(email, profileData.role || "Admin"),
     createdAt: serverTimestamp(),
     name: profileData.name,
     staffId: profileData.staffId,
@@ -130,8 +171,8 @@ export const signInWithStaffId = async (
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   const firebaseUser = userCredential.user;
 
-  return {
+  return normalizeUserProfile({
     uid: firebaseUser.uid,
     ...(userData as Omit<UserProfile, "uid">)
-  };
+  });
 };

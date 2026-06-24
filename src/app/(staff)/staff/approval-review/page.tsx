@@ -14,6 +14,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
 import {
   createInAppNotification,
   triggerEmailNotification,
@@ -89,6 +90,9 @@ export default function ApprovalReviewPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [staffDistrict, setStaffDistrict] = useState(currentStaff.assignedDistrict);
   const [staffName, setStaffName] = useState(currentStaff.name);
+  const [staffRole, setStaffRole] = useState<UserRole>("Admin");
+
+  const isSuperAdmin = staffRole === "SuperAdmin";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -101,6 +105,12 @@ export default function ApprovalReviewPage() {
         const staffData = staffSnapshot.data();
         const district = readString(staffData.district);
         const name = readString(staffData.name);
+        const role =
+          readString(staffData.email, user.email).toLowerCase() === SUPERADMIN_EMAIL
+            ? "SuperAdmin"
+            : readUserRole(staffData.role);
+
+        setStaffRole(role);
 
         if (district) {
           setStaffDistrict(district);
@@ -121,13 +131,15 @@ export default function ApprovalReviewPage() {
     let isActive = true;
     setIsLoading(true);
 
-    const assignedApplicationQuery = query(
-      collection(db, "applications"),
-      where("district", "==", staffDistrict),
-    );
+    const applicationQueueQuery = isSuperAdmin
+      ? query(collection(db, "applications"))
+      : query(
+          collection(db, "applications"),
+          where("district", "==", staffDistrict),
+        );
 
     const unsubscribe = onSnapshot(
-      assignedApplicationQuery,
+      applicationQueueQuery,
       async (snapshot) => {
         try {
           const mappedApplications = await Promise.all(
@@ -176,7 +188,7 @@ export default function ApprovalReviewPage() {
       isActive = false;
       unsubscribe();
     };
-  }, [staffDistrict]);
+  }, [isSuperAdmin, staffDistrict]);
 
   const selectedApplication = applications.find(
     (application) => application.documentId === selectedId,
@@ -329,11 +341,13 @@ export default function ApprovalReviewPage() {
             Approval Review
           </h1>
           <p className="mt-0.5 max-w-2xl text-sm text-secondary">
-            Review applications assigned to your administrative area only.
+            {isSuperAdmin
+              ? "Review submissions across all seven mukims."
+              : "Review applications assigned to your administrative area only."}
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
             <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-            Assigned area: {staffDistrict}
+            {isSuperAdmin ? "Scope: All mukims" : `Assigned area: ${staffDistrict}`}
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 xl:w-auto">
@@ -400,7 +414,9 @@ export default function ApprovalReviewPage() {
             <p className="text-[11px] font-medium text-on-surface-variant">
               {isLoading
                 ? "Loading application records..."
-                : `${filteredApplications.length} assigned record(s) shown`}
+                : `${filteredApplications.length} ${
+                    isSuperAdmin ? "total" : "assigned"
+                  } record(s) shown`}
             </p>
           </div>
           <span className="material-symbols-outlined text-outline">view_list</span>
@@ -998,6 +1014,14 @@ function readString(...values: unknown[]) {
   );
 
   return typeof found === "string" ? found.trim() : "";
+}
+
+function readUserRole(value: unknown): UserRole {
+  if (value === "Applicant" || value === "Admin" || value === "SuperAdmin") {
+    return value;
+  }
+
+  return "Admin";
 }
 
 function StatusSummary({ label, value, tone }: { label: string; value: number; tone: string }) {

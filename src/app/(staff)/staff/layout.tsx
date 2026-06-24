@@ -16,6 +16,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = (event: React.MouseEvent) => {
@@ -23,13 +24,25 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     router.push("/login");
   };
 
+  const toggleSidebar = () => {
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setDesktopSidebarOpen((current) => !current);
+      return;
+    }
+
+    setMobileMenuOpen((current) => !current);
+  };
+
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="fixed left-0 top-0 z-50 flex h-14 w-full items-center justify-between border-b border-[#E2E8F0] bg-white px-6">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="material-symbols-outlined rounded-full p-1.5 text-gray-600 hover:bg-gray-50 md:hidden"
+            type="button"
+            aria-label="Toggle staff sidebar menu"
+            aria-expanded={desktopSidebarOpen || mobileMenuOpen}
+            onClick={toggleSidebar}
+            className="material-symbols-outlined rounded-full p-1.5 text-gray-600 transition hover:bg-gray-50"
           >
             menu
           </button>
@@ -68,7 +81,13 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       </header>
 
       <div className="flex pt-14">
-        <aside className="sticky top-14 hidden h-[calc(100vh-56px)] w-60 flex-col border-r border-[#E2E8F0] bg-white py-4 md:flex">
+        <aside
+          className={`sticky top-14 hidden h-[calc(100vh-56px)] shrink-0 flex-col overflow-hidden bg-white py-4 transition-[width,border-color] duration-300 ease-in-out md:flex ${
+            desktopSidebarOpen
+              ? "w-60 border-r border-[#E2E8F0]"
+              : "w-0 border-r border-transparent"
+          }`}
+        >
           <div className="mb-6 px-5">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
@@ -131,7 +150,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               aria-label="Close staff menu"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="fixed bottom-0 left-0 top-0 z-50 flex w-60 flex-col border-r border-[#E2E8F0] bg-white py-4 md:hidden">
+            <aside className="fixed bottom-0 left-0 top-0 z-50 flex w-60 flex-col border-r border-[#E2E8F0] bg-white py-4 transition-transform duration-300 ease-out md:hidden">
               <div className="mb-6 flex items-center justify-between px-5">
                 <div>
                   <h2 className="text-sm font-bold text-[#002D62]">Staff Portal</h2>
