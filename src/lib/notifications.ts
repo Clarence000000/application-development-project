@@ -109,6 +109,28 @@ export async function saveNotificationPreferences(
 export async function triggerEmailNotification(
   payload: EmailNotificationPayload,
 ) {
+  try {
+    const preferences = await getNotificationPreferences(payload.uid);
+
+    if (!isEmailAllowed(preferences, payload.eventType)) {
+      if (payload.notificationId) {
+        await updateNotificationChannelStatus(
+          payload.notificationId,
+          "email",
+          "disabled",
+          payload.recipientEmail,
+        );
+      }
+
+      return {
+        ok: true,
+        deliveryStatus: "disabled" as const,
+      };
+    }
+  } catch (error) {
+    console.warn("Could not precheck email notification preferences", error);
+  }
+
   const response = await fetch("/api/notifications/email", {
     method: "POST",
     headers: {
@@ -126,6 +148,25 @@ export async function triggerEmailNotification(
     ok: boolean;
     deliveryStatus: "sent" | "failed" | "disabled";
   }>;
+}
+
+function isEmailAllowed(
+  preferences: NotificationPreferences,
+  eventType: NotificationEventType,
+) {
+  if (!preferences.emailEnabled) {
+    return false;
+  }
+
+  if (eventType === "application_submitted") {
+    return preferences.applicationSubmitted;
+  }
+
+  if (eventType === "document_requested") {
+    return preferences.documentRequests;
+  }
+
+  return preferences.statusUpdates;
 }
 
 export async function createInAppNotification(

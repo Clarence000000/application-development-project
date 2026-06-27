@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 import type {
   EmailNotificationPayload,
   NotificationEventType,
@@ -18,6 +11,7 @@ import type {
 export const runtime = "nodejs";
 
 type DeliveryStatus = "sent" | "failed";
+const adminDb = getAdminDb();
 
 const defaultPreferences: NotificationPreferences = {
   emailEnabled: true,
@@ -110,7 +104,10 @@ function getSmtpErrorMessage(error: unknown) {
 }
 
 async function getPreferences(uid: string) {
-  const preferencesSnap = await getDoc(doc(db, "notificationPreferences", uid));
+  const preferencesSnap = await adminDb
+    .collection("notificationPreferences")
+    .doc(uid)
+    .get();
 
   if (!preferencesSnap.exists()) {
     return defaultPreferences;
@@ -204,7 +201,7 @@ async function createHistoryRecord(
     return;
   }
 
-  await addDoc(collection(db, "notifications"), {
+  await adminDb.collection("notifications").add({
     uid: payload.uid,
     title: copy.title,
     message: copy.summary,
@@ -216,7 +213,7 @@ async function createHistoryRecord(
     deliveryStatus,
     read: false,
     recipient: payload.recipientEmail,
-    createdAt: serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -228,10 +225,10 @@ async function updateEmailDeliveryStatus(
     return;
   }
 
-  await updateDoc(doc(db, "notifications", payload.notificationId), {
+  await adminDb.collection("notifications").doc(payload.notificationId).update({
     emailStatus: deliveryStatus,
     emailRecipient: payload.recipientEmail,
-    updatedAt: serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 

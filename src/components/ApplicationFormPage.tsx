@@ -349,6 +349,7 @@ export default function ApplicationFormPage({
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
+      scrollToFirstError(nextErrors);
       return;
     }
 
@@ -357,6 +358,7 @@ export default function ApplicationFormPage({
       setErrors({
         form: "Please sign in again before submitting your application.",
       });
+      scrollToFirstError({ form: "Please sign in again before submitting your application." });
       return;
     }
 
@@ -417,9 +419,45 @@ export default function ApplicationFormPage({
       setErrors({
         form: "Application could not be submitted. Please try again.",
       });
+      scrollToFirstError({ form: "Application could not be submitted. Please try again." });
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function scrollToFirstError(nextErrors: FormErrors) {
+    const errorOrder = [
+      "district",
+      ...config.fields.map((field) => field.name),
+      "declaration",
+      "form",
+    ];
+    const firstErrorKey = errorOrder.find((key) => nextErrors[key]);
+
+    if (!firstErrorKey) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const target =
+        document.getElementById(firstErrorKey) ||
+        document.querySelector<HTMLElement>(
+          `[data-error-key="${firstErrorKey}"]`,
+        );
+
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      if ("focus" in target) {
+        target.focus({ preventScroll: true });
+      }
+    });
   }
 
   return (
@@ -481,7 +519,11 @@ export default function ApplicationFormPage({
       </section>
 
       {Object.keys(errors).length > 0 && (
-        <div className="border-l-4 border-error bg-error-container px-4 py-3 text-on-error-container">
+        <div
+          className="border-l-4 border-error bg-error-container px-4 py-3 text-on-error-container"
+          data-error-key="form"
+          tabIndex={-1}
+        >
           <p className="text-sm font-bold">
             Please review your application details.
           </p>
@@ -631,6 +673,7 @@ export default function ApplicationFormPage({
             <SectionTitle icon="gavel" title="Applicant Declaration" />
             <label className="mt-4 flex gap-3 border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface">
               <input
+                id="declaration"
                 type="checkbox"
                 checked={declarationAccepted}
                 onChange={(event) => {
