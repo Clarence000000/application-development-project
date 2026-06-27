@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase"; // adjust path depending on where your firebase configuration lives
 
 const navItems = [
   {
@@ -19,9 +21,15 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const handleLogout = (event: React.MouseEvent) => {
+  const handleLogout = async (event: React.MouseEvent) => {
     event.preventDefault();
-    router.push("/login");
+    try {
+      await signOut(auth); // Terminate session on Firebase servers
+      localStorage.removeItem("userRole"); // Wipe local cache token
+      router.push("/login"); // Securely redirect away
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   const toggleSidebar = () => {
@@ -42,7 +50,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             aria-label="Toggle staff sidebar menu"
             aria-expanded={desktopSidebarOpen || mobileMenuOpen}
             onClick={toggleSidebar}
-            className="material-symbols-outlined rounded-full p-1.5 text-gray-600 transition hover:bg-gray-50"
+            className="material-symbols-outlined rounded-full p-1.5 text-gray-900 transition hover:bg-gray-50"
           >
             menu
           </button>
@@ -52,30 +60,46 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="relative">
+          {/* Staff Profile Avatar Icon Toggle Button */}
           <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="flex items-center gap-2 rounded-full border border-outline-variant p-0.5 transition hover:bg-gray-50"
+            onClick={() => setProfileOpen((prev) => !prev)}
+            className="flex cursor-pointer items-center gap-2 p-0.5 rounded-full border border-outline-variant transition-all duration-200 hover:bg-slate-100 hover:border-slate-600 focus:outline-none"
           >
-            <span className="material-symbols-outlined flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[18px] text-white">
-              badge
-            </span>
-          </button>
-          {profileOpen && (
-            <div className="absolute right-0 z-50 mt-2 w-52 rounded-lg border border-[#E2E8F0] bg-white py-2 shadow-lg">
-              <div className="border-b border-gray-100 px-3 py-2">
-                <p className="text-xs font-bold text-on-surface">Staff Account</p>
-                <p className="text-[10px] font-medium text-on-surface-variant">
-                  Staff Workspace
-                </p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-error hover:bg-error-container/20"
-              >
-                <span className="material-symbols-outlined text-sm">logout</span>
-                Log Out
-              </button>
+            <div className="h-7 w-7 rounded-full overflow-hidden">
+              <img
+                alt="Staff Profile Avatar"
+                className="w-full h-full object-cover"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgJHdfJp_aL3WYl4th7I4aICU3qJBKIhAYgu2e43NJyVouU-5elW5XdY6wodTi82qCyiIJvuWgs52Xu_KzMWRaX0W8DtYURqXNfPj-18DlfAu1zLMC5zeI2mWBF3idk8DZWkEPwwpf0vA3JIyrl1VmKGoLxBwuMZUIQj7jdurgdJMT6906_c396TuZnvZYTHEpjsCa04orSmU71Wm-NvST3D6yGnccXFTksB1PUM9S21sjA0ajJGqzoXksgi9yGuUHND8FWQSwdgA" 
+              />
             </div>
+          </button>
+
+          {/* Dropdown Container Matrix */}
+          {profileOpen && (
+            <>
+              {/* 1. Invisible full-screen backdrop to capture outside clicks */}
+              <div 
+                className="fixed inset-0 z-40 cursor-default" 
+                onClick={() => setProfileOpen(false)}
+              />
+              
+              {/* 2. Actual Dropdown Menu Box */}
+              <div className="absolute right-0 z-50 mt-2 w-52 rounded-lg border border-[#E2E8F0] bg-white py-2 shadow-lg">
+                <div className="border-b border-gray-100 px-3 py-2">
+                  <p className="text-xs font-bold text-on-surface">Staff Account</p>
+                  <p className="text-[10px] font-medium text-on-surface-variant">
+                    Staff Workspace
+                  </p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm text-error hover:bg-error-container/20"
+                >
+                  <span className="material-symbols-outlined text-sm">logout</span>
+                  Log Out
+                </button>
+              </div>
+            </>
           )}
         </div>
       </header>

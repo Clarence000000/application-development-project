@@ -33,11 +33,16 @@ export default function LoginPage() {
       console.log("Logged in successfully as:", user.role);
       localStorage.setItem("userRole", user.role);
       
+      // --- MODIFIED ROUTING BLOCK ---
+      // Using window.location.href instead of router.push forces a full page hydration.
+      // This completely eliminates the Firestore token propagation race condition.
       if (user.role === "Admin" || user.role === "SuperAdmin") {
-        router.push("/staff/approval-review");
+        window.location.href = "/staff/approval-review";
       } else {
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }
+      // ------------------------------
+
     } catch (err: unknown) {
       console.error(err);
       switch (getAuthErrorCode(err)) {

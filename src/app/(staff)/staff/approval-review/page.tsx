@@ -44,6 +44,7 @@ type ApplicationRecord = {
   supportingNotes: string;
   sortTime: number;
   timeline: { title: string; date: string; done: boolean }[];
+  isUrgent: boolean; // For reprioritization
 };
 
 const currentStaff = {
@@ -165,7 +166,19 @@ export default function ApprovalReviewPage() {
 
           if (isActive) {
             setApplications(
-              mappedApplications.sort((left, right) => right.sortTime - left.sortTime),
+              mappedApplications.sort((left, right) => {
+                // 1. If one is urgent and the other isn't, float urgent to top
+                if (left.isUrgent && !right.isUrgent) return -1;
+                if (!left.isUrgent && right.isUrgent) return 1;
+
+                // 2. If both are urgent, sort oldest first to address critical items first
+                if (left.isUrgent && right.isUrgent) {
+                  return left.sortTime - right.sortTime;
+                }
+
+                // 3. For all standard non-urgent items, sort newest first
+                return right.sortTime - left.sortTime;
+              }),
             );
             setIsLoading(false);
           }
@@ -442,14 +455,27 @@ export default function ApprovalReviewPage() {
                 return (
                   <tr
                     key={application.documentId}
-                    className="border-t border-outline-variant transition hover:bg-surface-container-low"
+                    className={`border-t border-outline-variant transition ${
+                      application.isUrgent 
+                        ? "bg-amber-100/70 hover:bg-amber-200/80" 
+                        : "hover:bg-surface-container-low"
+                    }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
                           <span className="material-symbols-outlined text-[19px]">{style.icon}</span>
                         </div>
-                        <span className="text-xs font-bold text-primary">{application.id}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-bold text-primary">{application.id}</span>
+                          {/* URGENT INDICATOR TAG */}
+                          {application.isUrgent && (
+                            <span className="inline-flex w-fit items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-950 animate-pulse">
+                              <span className="material-symbols-outlined text-[11px]">warning</span>
+                              &gt;3 Days Overdue
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-on-surface">
@@ -884,6 +910,12 @@ function mapApplicationRecord(
   const status = mapApprovalStatus(application);
   const submittedDate = formatFirestoreDate(application.submittedAt);
   const submittedAt = toDate(application.submittedAt);
+  let isUrgent = false;
+  if (submittedAt && status !== "Approved" && status !== "Rejected") {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    isUrgent = submittedAt < threeDaysAgo;
+  }
   const staffVettedAt = formatFirestoreDate(application.staffVettedAt);
   const approvedAt = formatFirestoreDate(application.approvedAt);
   const rejectedAt = formatFirestoreDate(application.rejectedAt);
@@ -922,6 +954,7 @@ function mapApplicationRecord(
         application.staffComment,
       ) || "No staff remarks recorded yet.",
     sortTime: submittedAt?.getTime() || 0,
+    isUrgent,
     timeline: [
       {
         title: "Application Submitted",
