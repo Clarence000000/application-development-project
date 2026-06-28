@@ -11,7 +11,7 @@ export type StaffApplicationNotification = {
   applicantName: string;
   district: string;
   pendingDays: number;
-  submittedAt: Date | null;
+  submittedAt: Date;
   kind: StaffApplicationNotificationKind;
 };
 

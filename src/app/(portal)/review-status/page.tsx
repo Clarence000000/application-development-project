@@ -719,9 +719,7 @@ function mapFirestoreApplication(
   const updatedDate = toDate(data.updatedAt);
   const serialNumber = readString(data.serialNumber);
   const officeRemark = readString(
-    data.officeComment,
-    data.rejectionReason,
-    data.staffComment,
+    data.officeComment || data.rejectionReason || data.staffComment,
   );
   const formSlug = readString(data.formSlug) || readString(data.type);
   const title =
