@@ -1,6 +1,15 @@
 "use client";
 
-import type { Timestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+  type Firestore,
+  type Timestamp,
+} from "firebase/firestore";
+import type { UserRole } from "@/lib/user_auth";
 
 export type StaffApplicationNotificationKind = "new_submission" | "overdue_pending";
 
@@ -18,6 +27,94 @@ export type StaffApplicationNotification = {
 const NEW_SUBMISSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const OVERDUE_PENDING_DAYS = 3;
 const READ_STORAGE_PREFIX = "staffNotificationReads";
+const READ_SYNC_EVENT = "staff-notification-reads-updated";
+const FRESH_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
+const STAFF_NOTIFICATION_REFRESH_MS = 5_000;
+const STAFF_NOTIFICATION_STARTUP_REFRESH_MS = 1_000;
+
+type StaffNotificationSubscriptionOptions = {
+  db: Firestore;
+  role: UserRole;
+  district: string;
+  onChange: (items: StaffApplicationNotification[]) => void;
+  onError?: (error: Error) => void;
+};
+
+export function subscribeStaffApplicationNotifications({
+  db,
+  role,
+  district,
+  onChange,
+  onError,
+}: StaffNotificationSubscriptionOptions) {
+  const applicationsQuery =
+    role === "SuperAdmin"
+      ? query(collection(db, "applications"))
+      : query(collection(db, "applications"), where("district", "==", district));
+
+  let isActive = true;
+
+  const publishSnapshot = (
+    docs: Array<{ id: string; data: () => Record<string, unknown> }>,
+  ) => {
+    const priorityItems = docs
+      .map((applicationSnapshot) =>
+        mapStaffApplicationNotification(
+          applicationSnapshot.id,
+          applicationSnapshot.data(),
+        ),
+      )
+      .filter((item): item is StaffApplicationNotification => Boolean(item))
+      .sort(sortStaffApplicationNotifications);
+
+    onChange(priorityItems);
+  };
+
+  const refreshSnapshot = async () => {
+    try {
+      const snapshot = await getDocs(applicationsQuery);
+      if (isActive) {
+        publishSnapshot(snapshot.docs);
+      }
+    } catch (error) {
+      if (isActive) {
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+  };
+
+  const unsubscribeSnapshot = onSnapshot(
+    applicationsQuery,
+    (snapshot) => publishSnapshot(snapshot.docs),
+    (error) => {
+      onError?.(error);
+      refreshSnapshot();
+    },
+  );
+  const refreshTimer = window.setInterval(
+    refreshSnapshot,
+    STAFF_NOTIFICATION_REFRESH_MS,
+  );
+  const startupRefreshTimer = window.setTimeout(
+    refreshSnapshot,
+    STAFF_NOTIFICATION_STARTUP_REFRESH_MS,
+  );
+  const handleVisibilityChange = () => {
+    if (!document.hidden) {
+      refreshSnapshot();
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    isActive = false;
+    unsubscribeSnapshot();
+    window.clearInterval(refreshTimer);
+    window.clearTimeout(startupRefreshTimer);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+}
 
 export function mapStaffApplicationNotification(
   documentId: string,
@@ -38,8 +135,10 @@ export function mapStaffApplicationNotification(
   }
 
   const ageMs = Date.now() - submittedAt.getTime();
-  const pendingDays = Math.floor(ageMs / 86_400_000);
-  const isNewSubmission = ageMs >= 0 && ageMs < NEW_SUBMISSION_WINDOW_MS;
+  const normalizedAgeMs = Math.max(ageMs, 0);
+  const pendingDays = Math.floor(normalizedAgeMs / 86_400_000);
+  const isNewSubmission =
+    ageMs >= -FRESH_TIMESTAMP_SKEW_MS && normalizedAgeMs < NEW_SUBMISSION_WINDOW_MS;
   const isOverduePending = pendingDays >= OVERDUE_PENDING_DAYS;
 
   if (!isNewSubmission && !isOverduePending) {
@@ -118,6 +217,45 @@ export function saveStaffNotificationReadKeys(
     getReadStorageKey(staffUid),
     JSON.stringify(Array.from(readKeys)),
   );
+  window.setTimeout(() => {
+    window.dispatchEvent(
+      new CustomEvent(READ_SYNC_EVENT, {
+        detail: { staffUid },
+      }),
+    );
+  }, 0);
+}
+
+export function subscribeStaffNotificationReadKeys(
+  staffUid: string,
+  onChange: (readKeys: Set<string>) => void,
+) {
+  if (!staffUid || typeof window === "undefined") {
+    return () => {};
+  }
+
+  const refreshReadKeys = () => {
+    onChange(loadStaffNotificationReadKeys(staffUid));
+  };
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === getReadStorageKey(staffUid)) {
+      refreshReadKeys();
+    }
+  };
+  const handleLocalSync = (event: Event) => {
+    const detail = (event as CustomEvent<{ staffUid?: string }>).detail;
+    if (detail?.staffUid === staffUid) {
+      refreshReadKeys();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(READ_SYNC_EVENT, handleLocalSync);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(READ_SYNC_EVENT, handleLocalSync);
+  };
 }
 
 function getReadStorageKey(staffUid: string) {
@@ -140,6 +278,17 @@ function readString(...values: unknown[]) {
 function toDate(value: unknown) {
   if (value && typeof value === "object" && "toDate" in value) {
     return (value as Timestamp).toDate();
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (value && typeof value === "object" && "seconds" in value) {
+    const seconds = (value as { seconds?: unknown }).seconds;
+    if (typeof seconds === "number") {
+      return new Date(seconds * 1000);
+    }
   }
 
   if (typeof value === "string") {

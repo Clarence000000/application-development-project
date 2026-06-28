@@ -6,21 +6,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection,
   doc,
   getDoc,
-  onSnapshot,
-  query,
-  where,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase"; // adjust path depending on where your firebase configuration lives
 import AiHelpChat from "@/components/AiHelpChat";
 import {
   getStaffNotificationKey,
   loadStaffNotificationReadKeys,
-  mapStaffApplicationNotification,
   saveStaffNotificationReadKeys,
-  sortStaffApplicationNotifications,
+  subscribeStaffApplicationNotifications,
+  subscribeStaffNotificationReadKeys,
   type StaffApplicationNotification,
 } from "@/lib/staffNotifications";
 import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
@@ -110,31 +106,16 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        const applicationsQuery =
-          role === "SuperAdmin"
-            ? query(collection(db, "applications"))
-            : query(collection(db, "applications"), where("district", "==", district));
-
-        unsubscribeApplications = onSnapshot(
-          applicationsQuery,
-          (snapshot) => {
-            const priorityItems = snapshot.docs
-              .map((applicationSnapshot) =>
-                mapStaffApplicationNotification(
-                  applicationSnapshot.id,
-                  applicationSnapshot.data(),
-                ),
-              )
-              .filter((item): item is StaffApplicationNotification => Boolean(item))
-              .sort(sortStaffApplicationNotifications);
-
-            setNotifications(priorityItems);
-          },
-          (error) => {
+        unsubscribeApplications = subscribeStaffApplicationNotifications({
+          db,
+          role,
+          district,
+          onChange: setNotifications,
+          onError: (error) => {
             console.error("Staff priority notification listener failed", error);
             setNotifications([]);
           },
-        );
+        });
       } catch (error) {
         console.error("Failed to load staff notification scope", error);
         setNotifications([]);
@@ -156,7 +137,13 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     [notifications, readNotificationKeys],
   );
   const activeCount = notifications.length;
-  const notificationCountLabel = activeCount > 99 ? "99+" : String(activeCount);
+  const notificationCountLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+
+  useEffect(() => {
+    if (!staffUid) return;
+
+    return subscribeStaffNotificationReadKeys(staffUid, setReadNotificationKeys);
+  }, [staffUid]);
 
   function markNotificationRead(notification: StaffApplicationNotification) {
     if (!staffUid) return;
@@ -219,7 +206,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               className="relative material-symbols-outlined rounded-full p-1.5 text-gray-600 transition hover:bg-gray-50"
             >
               notifications
-              {activeCount > 0 && (
+              {unreadCount > 0 && (
                 <span
                   className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[10px] font-mono leading-4 text-white"
                 >

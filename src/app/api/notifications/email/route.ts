@@ -6,7 +6,7 @@ import type {
   EmailNotificationPayload,
   NotificationEventType,
   NotificationPreferences,
-} from "@/lib/notifications";
+} from "@/lib/notificationTypes";
 
 export const runtime = "nodejs";
 

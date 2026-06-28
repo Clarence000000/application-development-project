@@ -5,20 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection,
   doc,
   getDoc,
-  onSnapshot,
-  query,
-  where,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import {
   getStaffNotificationKey,
   loadStaffNotificationReadKeys,
-  mapStaffApplicationNotification,
   saveStaffNotificationReadKeys,
-  sortStaffApplicationNotifications,
+  subscribeStaffApplicationNotifications,
+  subscribeStaffNotificationReadKeys,
   type StaffApplicationNotification,
 } from "@/lib/staffNotifications";
 import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
@@ -68,32 +64,19 @@ export default function StaffNotificationsPage() {
 
         setScopeLabel(role === "SuperAdmin" ? "All mukims" : district);
 
-        const applicationsQuery =
-          role === "SuperAdmin"
-            ? query(collection(db, "applications"))
-            : query(collection(db, "applications"), where("district", "==", district));
-
-        unsubscribeApplications = onSnapshot(
-          applicationsQuery,
-          (snapshot) => {
-            const priorityItems = snapshot.docs
-              .map((applicationSnapshot) =>
-                mapStaffApplicationNotification(
-                  applicationSnapshot.id,
-                  applicationSnapshot.data(),
-                ),
-              )
-              .filter((item): item is StaffApplicationNotification => Boolean(item))
-              .sort(sortStaffApplicationNotifications);
-
+        unsubscribeApplications = subscribeStaffApplicationNotifications({
+          db,
+          role,
+          district,
+          onChange: (priorityItems) => {
             setNotifications(priorityItems);
             setIsLoading(false);
           },
-          (error) => {
+          onError: (error) => {
             console.error("Staff notification listener failed", error);
             setIsLoading(false);
           },
-        );
+        });
       } catch (error) {
         console.error("Failed to load staff notifications", error);
         setIsLoading(false);
@@ -122,6 +105,12 @@ export default function StaffNotificationsPage() {
       ).length,
     [notifications, readNotificationKeys],
   );
+
+  useEffect(() => {
+    if (!staffUid) return;
+
+    return subscribeStaffNotificationReadKeys(staffUid, setReadNotificationKeys);
+  }, [staffUid]);
 
   function markNotificationRead(notification: StaffApplicationNotification) {
     if (!staffUid) return;

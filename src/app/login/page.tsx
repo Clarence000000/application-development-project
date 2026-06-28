@@ -2,11 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn, signInWithStaffId } from "../../lib/user_auth"; 
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -98,30 +96,83 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-on-background font-sans">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-on-background font-sans">
       {/* TopAppBar */}
-      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-white dark:bg-gray-900 border-b border-[#E2E8F0] dark:border-gray-800">
+      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-[#0F172A] border-b border-white/10">
         <div className="flex items-center gap-4">
-          <span className="text-lg font-bold text-[#002D62] dark:text-white tracking-tight">
-            Certificate Validation System
+          <span className="text-lg font-bold text-white tracking-tight">
+            MyPerakuan
           </span>
         </div>
       </header>
 
       {/* Main Content Canvas */}
-      <main className="flex-grow flex items-center justify-center pt-24 pb-16 px-6 bg-white">
-        <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <main className="flex-grow flex items-center justify-center pt-24 pb-16 px-6">
+        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           
           {/* Branding/Hero Section */}
-          <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-8 animate-fade-in">
-             <h1 className="text-4xl font-extrabold text-primary leading-tight tracking-tight">
+          <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
+            <div className="max-w-xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-semibold text-[#475569] shadow-sm">
+                <span className="material-symbols-outlined text-[16px] text-primary">
+                  verified
+                </span>
+                Secure certificate portal
+              </div>
+              <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
                 Certificate Validation System
-             </h1>
+              </h1>
+              <p className="mt-4 max-w-lg text-base leading-7 text-[#475569]">
+                Verify applications, review official records, and manage certificate requests from one secure workspace.
+              </p>
+            </div>
+
+            <div className="grid max-w-xl grid-cols-3 gap-3">
+              {[
+                { icon: "lock", label: "Secure Access" },
+                { icon: "fact_check", label: "Review Status" },
+                { icon: "workspace_premium", label: "Official Records" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[20px] text-primary">
+                    {item.icon}
+                  </span>
+                  <p className="mt-2 text-xs font-bold text-[#0F172A]">
+                    {item.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="relative h-40 max-w-xl overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+              <div className="absolute left-6 top-6 h-24 w-20 rounded-md border border-[#CBD5E1] bg-[#F8FAFC]" />
+              <div className="absolute left-10 top-10 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white">
+                <span className="material-symbols-outlined text-[26px]">
+                  approval
+                </span>
+              </div>
+              <div className="absolute left-36 top-8 h-3 w-56 rounded-full bg-[#CBD5E1]" />
+              <div className="absolute left-36 top-14 h-2 w-72 rounded-full bg-[#E2E8F0]" />
+              <div className="absolute left-36 top-28 grid grid-cols-3 gap-3">
+                <span className="h-7 w-24 rounded-md bg-[#EFF6FF]" />
+                <span className="h-7 w-24 rounded-md bg-[#F1F5F9]" />
+                <span className="h-7 w-24 rounded-md bg-[#F8FAFC]" />
+              </div>
+              <div className="absolute right-0 top-0 h-full w-1 bg-primary" />
+            </div>
           </div>
 
           {/* Login Card */}
           <div className="lg:col-span-5 flex justify-center lg:justify-end">
             <div className="w-full max-w-sm bg-white border border-[#E2E8F0] rounded-xl p-8 shadow-sm">
+              <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-[#EFF6FF] text-primary">
+                <span className="material-symbols-outlined text-[24px]">
+                  shield_person
+                </span>
+              </div>
               <div className="mb-6 text-center lg:text-left">
                 <h2 className="text-2xl font-bold text-primary mb-1">Welcome Back</h2>
                 <p className="text-sm text-on-surface-variant">Please log in to access your account.</p>
