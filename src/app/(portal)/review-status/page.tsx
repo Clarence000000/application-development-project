@@ -29,7 +29,6 @@ interface Application {
   statusColor: string;
   statusBg: string;
   statusDot: string;
-  warning?: string;
   link?: string;
   downloadUrl?: string;
   serialNumber?: string;
@@ -354,14 +353,6 @@ function ReviewStatusContent() {
                       </span>
                       {app.meta}
                     </span>
-                    {app.warning && (
-                      <span className="flex items-center gap-1 text-error font-semibold">
-                        <span className="material-symbols-outlined text-[14px]">
-                          error
-                        </span>
-                        {app.warning}
-                      </span>
-                    )}
                     {app.serialNumber && (
                       <span className="flex items-center gap-1 text-green-700 font-bold">
                         <span className="material-symbols-outlined text-[14px]">
@@ -566,17 +557,6 @@ function ReviewStatusContent() {
                   </div>
                 </div>
 
-                {selectedApp.warning && (
-                  <div className="bg-error-container/30 border border-error/15 rounded-lg p-2.5 flex items-start gap-2 text-xs">
-                    <span className="material-symbols-outlined text-error text-sm shrink-0">
-                      warning
-                    </span>
-                    <p className="text-on-error-container font-semibold">
-                      Action Needed: {selectedApp.warning}
-                    </p>
-                  </div>
-                )}
-
                 {selectedApp.serialNumber && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-start gap-2 text-xs">
                     <span className="material-symbols-outlined text-green-700 text-sm shrink-0">
@@ -768,10 +748,6 @@ function mapFirestoreApplication(
     officeRemark: officeRemark || undefined,
     downloadUrl:
       status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
-    warning:
-      status === "Rejected"
-        ? readString(data.rejectionReason) || "Application rejected"
-        : undefined,
     timeline: buildTimeline(status, displayDate, approvedAt, rejectedAt),
     sortTime:
       (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,

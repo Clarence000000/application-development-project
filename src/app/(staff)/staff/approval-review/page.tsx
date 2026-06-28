@@ -56,7 +56,10 @@ const currentStaff = {
   assignedDistrict: "Mukim Ayer Hitam",
 };
 
-const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: string }> = {
+const statusStyles: Record<
+  ApprovalStatus,
+  { badge: string; dot: string; icon: string }
+> = {
   "Pending Review": {
     badge: "bg-secondary-container text-on-secondary-container",
     dot: "bg-on-secondary-container",
@@ -89,13 +92,17 @@ export default function ApprovalReviewPage() {
   const focusedReference = searchParams.get("focus");
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"All" | ApprovalStatus>("All");
+  const [statusFilter, setStatusFilter] = useState<"All" | ApprovalStatus>(
+    "All",
+  );
   const [search, setSearch] = useState("");
   const [remarks, setRemarks] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [staffDistrict, setStaffDistrict] = useState(currentStaff.assignedDistrict);
+  const [staffDistrict, setStaffDistrict] = useState(
+    currentStaff.assignedDistrict,
+  );
   const [staffName, setStaffName] = useState(currentStaff.name);
   const [staffRole, setStaffRole] = useState<UserRole>("Admin");
   const [aiLoadingTask, setAiLoadingTask] = useState<AiReviewTask | null>(null);
@@ -116,7 +123,8 @@ export default function ApprovalReviewPage() {
         const district = readString(staffData.district);
         const name = readString(staffData.name);
         const role =
-          readString(staffData.email, user.email).toLowerCase() === SUPERADMIN_EMAIL
+          readString(staffData.email, user.email).toLowerCase() ===
+          SUPERADMIN_EMAIL
             ? "SuperAdmin"
             : readUserRole(staffData.role);
 
@@ -154,23 +162,27 @@ export default function ApprovalReviewPage() {
         try {
           const mappedApplications = await Promise.all(
             snapshot.docs
-            .filter((applicationSnapshot) => {
-              return readString(applicationSnapshot.data().status).toLowerCase() !== "draft";
-            })
-            .map(async (applicationSnapshot) => {
-              const application = applicationSnapshot.data();
-              const uid = readString(application.uid, application.userId);
-              const userSnapshot = uid
-                ? await getDoc(doc(db, "users", uid))
-                : null;
-              const user = userSnapshot?.exists() ? userSnapshot.data() : {};
+              .filter((applicationSnapshot) => {
+                return (
+                  readString(
+                    applicationSnapshot.data().status,
+                  ).toLowerCase() !== "draft"
+                );
+              })
+              .map(async (applicationSnapshot) => {
+                const application = applicationSnapshot.data();
+                const uid = readString(application.uid, application.userId);
+                const userSnapshot = uid
+                  ? await getDoc(doc(db, "users", uid))
+                  : null;
+                const user = userSnapshot?.exists() ? userSnapshot.data() : {};
 
-              return mapApplicationRecord(
-                applicationSnapshot.id,
-                application,
-                user,
-              );
-            }),
+                return mapApplicationRecord(
+                  applicationSnapshot.id,
+                  application,
+                  user,
+                );
+              }),
           );
 
           if (isActive) {
@@ -246,7 +258,8 @@ export default function ApprovalReviewPage() {
         application.id.toLowerCase().includes(query) ||
         application.applicantName.toLowerCase().includes(query) ||
         application.formName.toLowerCase().includes(query);
-      const matchesStatus = statusFilter === "All" || application.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "All" || application.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -254,17 +267,45 @@ export default function ApprovalReviewPage() {
 
   const counts = useMemo(
     () => ({
-      pending: assignedApplications.filter((application) => application.status === "Pending Review").length,
-      vetted: assignedApplications.filter((application) => application.status === "Staff Vetted").length,
-      actionRequired: assignedApplications.filter((application) => application.status === "Action Required").length,
-      approved: assignedApplications.filter((application) => application.status === "Approved").length,
-      rejected: assignedApplications.filter((application) => application.status === "Rejected").length,
+      pending: assignedApplications.filter(
+        (application) => application.status === "Pending Review",
+      ).length,
+      vetted: assignedApplications.filter(
+        (application) => application.status === "Staff Vetted",
+      ).length,
+      actionRequired: assignedApplications.filter(
+        (application) => application.status === "Action Required",
+      ).length,
+      approved: assignedApplications.filter(
+        (application) => application.status === "Approved",
+      ).length,
+      rejected: assignedApplications.filter(
+        (application) => application.status === "Rejected",
+      ).length,
     }),
     [assignedApplications],
   );
 
+  const staffVettedDisabled =
+    !selectedApplication ||
+    isDecisionActionDisabled(selectedApplication.status, "staff_vetted");
+  const approveDisabled =
+    !selectedApplication ||
+    isDecisionActionDisabled(selectedApplication.status, "approve");
+  const rejectDisabled =
+    !selectedApplication ||
+    isDecisionActionDisabled(selectedApplication.status, "reject");
+
   const updateStatus = async (nextStatus: ApprovalStatus) => {
     if (!selectedApplication) return;
+
+    const action = getDecisionAction(nextStatus);
+    if (
+      action &&
+      isDecisionActionDisabled(selectedApplication.status, action)
+    ) {
+      return;
+    }
 
     const note = remarks.trim();
 
@@ -310,7 +351,10 @@ export default function ApprovalReviewPage() {
       if (failedNotifications.length === 0) {
         showToast(`${selectedApplication.id} updated to ${nextStatus}.`);
       } else {
-        console.warn("Decision notification channel failed", failedNotifications);
+        console.warn(
+          "Decision notification channel failed",
+          failedNotifications,
+        );
         showToast(
           `${selectedApplication.id} updated, but ${failedNotifications
             .map((result) => result.channel)
@@ -366,7 +410,9 @@ export default function ApprovalReviewPage() {
           message: note,
           actionUrl: `/review-status?focus=${encodeURIComponent(selectedApplication.id)}`,
         });
-        showToast(`${selectedApplication.id} missing document request recorded.`);
+        showToast(
+          `${selectedApplication.id} missing document request recorded.`,
+        );
       } catch (emailError) {
         console.warn("Missing document email notification failed", emailError);
         showToast(`${selectedApplication.id} updated, but email failed.`);
@@ -403,7 +449,9 @@ export default function ApprovalReviewPage() {
       } | null;
 
       if (!response.ok || !data?.text) {
-        throw new Error(data?.error || "AI assistant could not generate a response.");
+        throw new Error(
+          data?.error || "AI assistant could not generate a response.",
+        );
       }
 
       setAiResult(data.text);
@@ -437,16 +485,40 @@ export default function ApprovalReviewPage() {
               : "Review applications assigned to your administrative area only."}
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
-            <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-            {isSuperAdmin ? "Scope: All mukims" : `Assigned area: ${staffDistrict}`}
+            <span className="material-symbols-outlined text-[16px] text-primary">
+              location_on
+            </span>
+            {isSuperAdmin
+              ? "Scope: All mukims"
+              : `Assigned area: ${staffDistrict}`}
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 xl:w-auto">
-          <StatusSummary label="Pending" value={counts.pending} tone="bg-secondary-container text-on-secondary-container" />
-          <StatusSummary label="Vetted" value={counts.vetted} tone="bg-blue-100 text-blue-800" />
-          <StatusSummary label="Action" value={counts.actionRequired} tone="bg-yellow-100 text-yellow-800" />
-          <StatusSummary label="Approved" value={counts.approved} tone="bg-green-100 text-green-800" />
-          <StatusSummary label="Rejected" value={counts.rejected} tone="bg-error-container text-on-error-container" />
+          <StatusSummary
+            label="Pending"
+            value={counts.pending}
+            tone="bg-secondary-container text-on-secondary-container"
+          />
+          <StatusSummary
+            label="Vetted"
+            value={counts.vetted}
+            tone="bg-blue-100 text-blue-800"
+          />
+          <StatusSummary
+            label="Action"
+            value={counts.actionRequired}
+            tone="bg-yellow-100 text-yellow-800"
+          />
+          <StatusSummary
+            label="Approved"
+            value={counts.approved}
+            tone="bg-green-100 text-green-800"
+          />
+          <StatusSummary
+            label="Rejected"
+            value={counts.rejected}
+            tone="bg-error-container text-on-error-container"
+          />
         </div>
       </header>
 
@@ -475,7 +547,9 @@ export default function ApprovalReviewPage() {
             <select
               className="w-full rounded-lg border border-outline bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as "All" | ApprovalStatus)}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as "All" | ApprovalStatus)
+              }
             >
               <option>All</option>
               <option>Pending Review</option>
@@ -492,7 +566,9 @@ export default function ApprovalReviewPage() {
               setStatusFilter("All");
             }}
           >
-            <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+            <span className="material-symbols-outlined text-[18px]">
+              restart_alt
+            </span>
             Clear
           </button>
         </div>
@@ -501,7 +577,9 @@ export default function ApprovalReviewPage() {
       <section className="overflow-hidden rounded-lg border border-outline-variant bg-white">
         <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
           <div>
-            <h2 className="text-sm font-bold text-primary">Application Queue</h2>
+            <h2 className="text-sm font-bold text-primary">
+              Application Queue
+            </h2>
             <p className="text-[11px] font-medium text-on-surface-variant">
               {isLoading
                 ? "Loading application records..."
@@ -510,7 +588,9 @@ export default function ApprovalReviewPage() {
                   } record(s) shown`}
             </p>
           </div>
-          <span className="material-symbols-outlined text-outline">view_list</span>
+          <span className="material-symbols-outlined text-outline">
+            view_list
+          </span>
         </div>
 
         <div className="hidden xl:block">
@@ -534,22 +614,28 @@ export default function ApprovalReviewPage() {
                   <tr
                     key={application.documentId}
                     className={`border-t border-outline-variant transition ${
-                      application.isUrgent 
-                        ? "bg-amber-100/70 hover:bg-amber-200/80" 
+                      application.isUrgent
+                        ? "bg-amber-100/70 hover:bg-amber-200/80"
                         : "hover:bg-surface-container-low"
                     }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
-                          <span className="material-symbols-outlined text-[19px]">{style.icon}</span>
+                          <span className="material-symbols-outlined text-[19px]">
+                            {style.icon}
+                          </span>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-bold text-primary">{application.id}</span>
+                          <span className="text-xs font-bold text-primary">
+                            {application.id}
+                          </span>
                           {/* URGENT INDICATOR TAG */}
                           {application.isUrgent && (
                             <span className="inline-flex w-fit items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-950 animate-pulse">
-                              <span className="material-symbols-outlined text-[11px]">warning</span>
+                              <span className="material-symbols-outlined text-[11px]">
+                                warning
+                              </span>
                               &gt;3 Days Overdue
                             </span>
                           )}
@@ -580,7 +666,9 @@ export default function ApprovalReviewPage() {
                         onClick={() => setSelectedId(application.documentId)}
                       >
                         View
-                        <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-[15px]">
+                          chevron_right
+                        </span>
                       </button>
                     </td>
                   </tr>
@@ -602,7 +690,9 @@ export default function ApprovalReviewPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-primary">
-                    <span className="material-symbols-outlined text-[19px]">{style.icon}</span>
+                    <span className="material-symbols-outlined text-[19px]">
+                      {style.icon}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -612,7 +702,9 @@ export default function ApprovalReviewPage() {
                       <StatusBadge status={application.status} />
                       {application.isUrgent && (
                         <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
-                          <span className="material-symbols-outlined text-[11px]">warning</span>
+                          <span className="material-symbols-outlined text-[11px]">
+                            warning
+                          </span>
                           &gt;3 Days Overdue
                         </span>
                       )}
@@ -625,11 +717,15 @@ export default function ApprovalReviewPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-on-surface-variant">
                       <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                        <span className="material-symbols-outlined text-[14px]">
+                          calendar_today
+                        </span>
                         {application.submittedDate}
                       </span>
                       <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">location_on</span>
+                        <span className="material-symbols-outlined text-[14px]">
+                          location_on
+                        </span>
                         {application.district}
                       </span>
                     </div>
@@ -642,8 +738,12 @@ export default function ApprovalReviewPage() {
 
         {!isLoading && filteredApplications.length === 0 && (
           <div className="p-8 text-center">
-            <span className="material-symbols-outlined text-3xl text-outline">search_off</span>
-            <p className="mt-2 text-sm font-bold text-on-surface">No matching applications</p>
+            <span className="material-symbols-outlined text-3xl text-outline">
+              search_off
+            </span>
+            <p className="mt-2 text-sm font-bold text-on-surface">
+              No matching applications
+            </p>
             <p className="mt-1 text-xs text-on-surface-variant">
               Adjust the search keyword or status filter.
             </p>
@@ -692,7 +792,8 @@ export default function ApprovalReviewPage() {
                     Application Detail
                   </p>
                   <p className="mt-1 text-xs text-on-surface-variant">
-                    Review supporting information and record the latest decision.
+                    Review supporting information and record the latest
+                    decision.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -711,15 +812,36 @@ export default function ApprovalReviewPage() {
                     Applicant Details
                   </h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <DetailItem label="IC Number" value={selectedApplication.idNumber} />
-                    <DetailItem label="Phone Number" value={selectedApplication.phoneNumber} />
-                    <DetailItem label="Email" value={selectedApplication.emailAddress} />
-                    <DetailItem label="District" value={selectedApplication.district} />
-                    <DetailItem label="Submitted Date" value={selectedApplication.submittedDate} />
+                    <DetailItem
+                      label="IC Number"
+                      value={selectedApplication.idNumber}
+                    />
+                    <DetailItem
+                      label="Phone Number"
+                      value={selectedApplication.phoneNumber}
+                    />
+                    <DetailItem
+                      label="Email"
+                      value={selectedApplication.emailAddress}
+                    />
+                    <DetailItem
+                      label="District"
+                      value={selectedApplication.district}
+                    />
+                    <DetailItem
+                      label="Submitted Date"
+                      value={selectedApplication.submittedDate}
+                    />
                   </div>
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <DetailItem label="Address" value={selectedApplication.address} />
-                    <DetailItem label="Purpose" value={selectedApplication.purpose} />
+                    <DetailItem
+                      label="Address"
+                      value={selectedApplication.address}
+                    />
+                    <DetailItem
+                      label="Purpose"
+                      value={selectedApplication.purpose}
+                    />
                   </div>
                 </section>
 
@@ -763,11 +885,15 @@ export default function ApprovalReviewPage() {
                               step.done ? "text-primary" : "text-outline"
                             }`}
                           >
-                            {step.done ? "check_circle" : "radio_button_unchecked"}
+                            {step.done
+                              ? "check_circle"
+                              : "radio_button_unchecked"}
                           </span>
                           <p
                             className={`truncate text-xs font-bold ${
-                              step.done ? "text-primary" : "text-on-surface-variant"
+                              step.done
+                                ? "text-primary"
+                                : "text-on-surface-variant"
                             }`}
                           >
                             {step.title}
@@ -821,7 +947,9 @@ export default function ApprovalReviewPage() {
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
                         onClick={() => setRemarks(toPlainRemark(aiResult))}
                       >
-                        <span className="material-symbols-outlined text-[16px]">content_paste</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          content_paste
+                        </span>
                         Use as Remark
                       </button>
                     </div>
@@ -833,38 +961,34 @@ export default function ApprovalReviewPage() {
                     Decision Actions
                   </h3>
                   <div className="mt-3 space-y-2">
-                    <button
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container"
-                      disabled={isUpdating}
+                    <DecisionActionButton
+                      icon="fact_check"
+                      label="Mark as Staff Vetted"
+                      tone="outline"
+                      disabled={isUpdating || staffVettedDisabled}
                       onClick={() => updateStatus("Staff Vetted")}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">fact_check</span>
-                      Mark as Staff Vetted
-                    </button>
-                    <button
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800 transition hover:bg-yellow-100"
+                    />
+                    <DecisionActionButton
+                      icon="upload_file"
+                      label="Request Missing Document"
+                      tone="warning"
                       disabled={isUpdating}
                       onClick={requestMissingDocument}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">upload_file</span>
-                      Request Missing Document
-                    </button>
-                    <button
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-700 px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
-                      disabled={isUpdating}
+                    />
+                    <DecisionActionButton
+                      icon="verified"
+                      label="Approve"
+                      tone="approve"
+                      disabled={isUpdating || approveDisabled}
                       onClick={() => updateStatus("Approved")}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">verified</span>
-                      Approve
-                    </button>
-                    <button
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-error px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
-                      disabled={isUpdating}
+                    />
+                    <DecisionActionButton
+                      icon="cancel"
+                      label="Reject"
+                      tone="reject"
+                      disabled={isUpdating || rejectDisabled}
                       onClick={() => updateStatus("Rejected")}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">cancel</span>
-                      Reject
-                    </button>
+                    />
                   </div>
                 </section>
               </aside>
@@ -875,7 +999,9 @@ export default function ApprovalReviewPage() {
 
       {toastMessage && (
         <div className="fixed bottom-20 right-6 z-50 flex items-center gap-2 rounded-lg bg-inverse-surface px-4 py-3 text-xs font-semibold text-inverse-on-surface shadow-lg">
-          <span className="material-symbols-outlined text-sm text-green-400">check_circle</span>
+          <span className="material-symbols-outlined text-sm text-green-400">
+            check_circle
+          </span>
           {toastMessage}
         </div>
       )}
@@ -998,7 +1124,7 @@ function buildApplicationStatusUpdate(
       ...baseUpdate,
       staffVetted: true,
       staffVettedAt: serverTimestamp(),
-    staffVettedBy: staffUser?.email || staffName,
+      staffVettedBy: staffUser?.email || staffName,
       staffVettedByUid: staffUser?.uid || null,
     };
   }
@@ -1063,8 +1189,11 @@ function mapApplicationRecord(
       "Office Application",
     submittedDate,
     district:
-      readString(application.district, application.district, application.meta) ||
-      currentStaff.assignedDistrict,
+      readString(
+        application.district,
+        application.district,
+        application.meta,
+      ) || currentStaff.assignedDistrict,
     status,
     purpose: readString(values.purpose, values.appealReason) || "-",
     address:
@@ -1108,9 +1237,7 @@ function mapApplicationRecord(
       },
       {
         title:
-          status === "Action Required"
-            ? "Action Required"
-            : "Office Decision",
+          status === "Action Required" ? "Action Required" : "Office Decision",
         date:
           status === "Approved"
             ? approvedAt
@@ -1128,7 +1255,9 @@ function mapApplicationRecord(
   };
 }
 
-function mapApprovalStatus(application: Record<string, unknown>): ApprovalStatus {
+function mapApprovalStatus(
+  application: Record<string, unknown>,
+): ApprovalStatus {
   const status = readString(application.status).toLowerCase();
 
   if (status === "approved") return "Approved";
@@ -1187,11 +1316,21 @@ function readUserRole(value: unknown): UserRole {
   return "Admin";
 }
 
-function StatusSummary({ label, value, tone }: { label: string; value: number; tone: string }) {
+function StatusSummary({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+}) {
   return (
     <div className={`min-w-24 rounded-lg px-3 py-2 text-center ${tone}`}>
       <p className="text-lg font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">
+        {label}
+      </p>
     </div>
   );
 }
@@ -1200,10 +1339,77 @@ function StatusBadge({ status }: { status: ApprovalStatus }) {
   const style = statusStyles[status];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}
+    >
       <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
       {status}
     </span>
+  );
+}
+
+type DecisionAction = "staff_vetted" | "approve" | "reject";
+
+function getDecisionAction(
+  nextStatus: ApprovalStatus,
+): DecisionAction | null {
+  if (nextStatus === "Staff Vetted") return "staff_vetted";
+  if (nextStatus === "Approved") return "approve";
+  if (nextStatus === "Rejected") return "reject";
+  return null;
+}
+
+function isDecisionActionDisabled(
+  status: ApprovalStatus,
+  action: DecisionAction,
+) {
+  switch (action) {
+    case "staff_vetted":
+      return (
+        status === "Staff Vetted" ||
+        status === "Action Required" ||
+        status === "Approved" ||
+        status === "Rejected"
+      );
+    case "approve":
+      return status === "Approved";
+    case "reject":
+      return status === "Rejected";
+  }
+}
+
+function DecisionActionButton({
+  icon,
+  label,
+  tone,
+  disabled,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  tone: "outline" | "warning" | "approve" | "reject";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const toneClasses = {
+    outline:
+      "border border-outline bg-white text-primary hover:bg-surface-container",
+    warning:
+      "border border-yellow-300 bg-yellow-50 text-yellow-800 hover:bg-yellow-100",
+    approve: "border border-green-700 bg-green-700 text-white hover:opacity-90",
+    reject: "border border-error bg-error text-white hover:opacity-90",
+  };
+
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:border-outline-variant disabled:bg-surface-container-high disabled:text-on-surface-variant disabled:opacity-60 ${toneClasses[tone]}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="material-symbols-outlined text-[16px]">{icon}</span>
+      {label}
+    </button>
   );
 }
 
@@ -1368,7 +1574,9 @@ function DetailItem({
   className?: string;
 }) {
   return (
-    <div className={`rounded-lg border border-outline-variant bg-surface-container-low p-3 ${className}`}>
+    <div
+      className={`rounded-lg border border-outline-variant bg-surface-container-low p-3 ${className}`}
+    >
       <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
         {label}
       </p>
