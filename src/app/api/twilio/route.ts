@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
-import { db } from "@/lib/firebase"; // Adjust path to point to your firebase config file
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebaseAdmin"; // Switch to Admin DB
+import { FieldValue } from "firebase-admin/firestore"; // Admin timestamps
 
 // Initialize Twilio client using your secure env variables
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -15,7 +9,9 @@ const apiKeySid = process.env.TWILIO_API_SID;
 const apiKeySecret = process.env.TWILIO_API_SECRET;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-// Helper function to format Malaysian phone numbers to E.164 format for Twilio (e.g. "012-345 6789" -> "+60123456789")
+const adminDb = getAdminDb();
+
+// Helper function to format Malaysian phone numbers to E.164 format for Twilio
 function formatToE164(phone: string): string {
   let cleaned = phone.replace(/\D/g, ""); // Remove dashes, spaces
   if (cleaned.startsWith("0")) {
@@ -54,11 +50,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // Generate a secure unique identifier natively without the 'uuid' package
+    // Generate a secure unique identifier natively
     const generatedNotificationId = crypto.randomUUID();
     const formattedPhone = formatToE164(phoneNumber);
 
-    // Build the precise text layout you requested
+    // Build the text layout
     const smsMessage = `Hello ${applicantName},\n\nApplication is ${status}\n\nYour ${formName} application (${id}) has been updated to ${status}.`;
 
     let deliveryStatus: "sent" | "failed" = "sent";
@@ -74,7 +70,7 @@ export async function POST(request: Request) {
       await twilioClient.messages.create({
         body: smsMessage,
         from: twilioPhoneNumber,
-        to: formattedPhone, // Remember: For Trial accounts, this number MUST be verified in the Twilio Console
+        to: formattedPhone,
       });
       deliveryStatus = "sent";
     } catch (twilioError) {
@@ -91,8 +87,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Save the transactional log directly into your "notifications" collection using modular Firestore syntax
-    await setDoc(doc(db, "notifications", generatedNotificationId), {
+    // Save transactional log securely via Admin SDK
+    await adminDb.collection("notifications").doc(generatedNotificationId).set({
       notificationId: generatedNotificationId,
       applicationId: id,
       uid,
@@ -105,7 +101,7 @@ export async function POST(request: Request) {
       referenceNumber: id,
       applicationTitle: formName,
       recipient: formattedPhone,
-      createdAt: new Date(), // Saves automatically as a Firestore Timestamp
+      createdAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({
@@ -135,24 +131,27 @@ async function updateSmsDeliveryStatus(
     return;
   }
 
-  await updateDoc(doc(db, "notifications", notificationId), {
+  await adminDb.collection("notifications").doc(notificationId).update({
     smsStatus: deliveryStatus,
     smsRecipient: typeof recipient === "string" ? formatToE164(recipient) : null,
-    updatedAt: serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 
 async function getSmsPreferences(uid: string) {
-  const preferencesSnap = await getDoc(doc(db, "notificationPreferences", uid));
+  const preferencesSnap = await adminDb
+    .collection("notificationPreferences")
+    .doc(uid)
+    .get();
 
-  if (!preferencesSnap.exists()) {
+  if (!preferencesSnap.exists) {
     return {
       smsEnabled: false,
       statusUpdates: true,
     };
   }
 
-  const data = preferencesSnap.data();
+  const data = preferencesSnap.data() || {};
 
   return {
     smsEnabled: typeof data.smsEnabled === "boolean" ? data.smsEnabled : false,

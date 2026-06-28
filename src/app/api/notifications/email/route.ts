@@ -109,7 +109,7 @@ async function getPreferences(uid: string) {
     .doc(uid)
     .get();
 
-  if (!preferencesSnap.exists()) {
+  if (!preferencesSnap.exists) {
     return defaultPreferences;
   }
 
