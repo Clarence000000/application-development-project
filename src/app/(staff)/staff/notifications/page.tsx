@@ -31,7 +31,7 @@ export default function StaffNotificationsPage() {
     () => new Set(),
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [scopeLabel, setScopeLabel] = useState("Assigned mukim");
+  const [scopeLabel, setScopeLabel] = useState("None");
 
   useEffect(() => {
     let unsubscribeApplications: (() => void) | null = null;
@@ -52,11 +52,19 @@ export default function StaffNotificationsPage() {
         setReadNotificationKeys(loadStaffNotificationReadKeys(user.uid));
         const staffSnapshot = await getDoc(doc(db, "users", user.uid));
         const staffData = staffSnapshot.exists() ? staffSnapshot.data() : {};
-        const district = readString(staffData.district) || "Mukim Ayer Hitam";
+        const district = readString(staffData.district);
         const role =
           readString(staffData.email, user.email).toLowerCase() === SUPERADMIN_EMAIL
             ? "SuperAdmin"
             : readUserRole(staffData.role);
+
+        if (role === "Admin" && !district) {
+          console.error("Staff account is missing an assigned district.");
+          setScopeLabel("No assigned mukim");
+          setNotifications([]);
+          setIsLoading(false);
+          return;
+        }
 
         setScopeLabel(role === "SuperAdmin" ? "All mukims" : district);
 
@@ -138,7 +146,7 @@ export default function StaffNotificationsPage() {
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
             <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-            Scope: {scopeLabel}
+            Assigned Area: {scopeLabel}
           </div>
         </div>
       </header>

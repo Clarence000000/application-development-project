@@ -79,6 +79,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         setStaffUid("");
         setReadNotificationKeys(new Set());
         setNotifications([]);
+        router.replace("/login");
         return;
       }
 
@@ -86,12 +87,28 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         setStaffUid(user.uid);
         setReadNotificationKeys(loadStaffNotificationReadKeys(user.uid));
         const staffSnapshot = await getDoc(doc(db, "users", user.uid));
-        const staffData = staffSnapshot.exists() ? staffSnapshot.data() : {};
-        const district = readString(staffData.district) || "Mukim Ayer Hitam";
+        if (!staffSnapshot.exists()) {
+          router.replace("/login");
+          return;
+        }
+
+        const staffData = staffSnapshot.data();
+        const district = readString(staffData.district);
         const role =
           readString(staffData.email, user.email).toLowerCase() === SUPERADMIN_EMAIL
             ? "SuperAdmin"
             : readUserRole(staffData.role);
+
+        if (role !== "Admin" && role !== "SuperAdmin") {
+          router.replace("/login");
+          return;
+        }
+
+        if (role === "Admin" && !district) {
+          console.error("Staff account is missing an assigned district.");
+          setNotifications([]);
+          return;
+        }
 
         const applicationsQuery =
           role === "SuperAdmin"
@@ -128,7 +145,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       unsubscribeApplications?.();
       unsubscribeAuth();
     };
-  }, []);
+  }, [router]);
 
   const unreadCount = useMemo(
     () =>
@@ -138,7 +155,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       ).length,
     [notifications, readNotificationKeys],
   );
-  const notificationCountLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+  const activeCount = notifications.length;
+  const notificationCountLabel = activeCount > 99 ? "99+" : String(activeCount);
 
   function markNotificationRead(notification: StaffApplicationNotification) {
     if (!staffUid) return;
@@ -193,7 +211,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           <div className="relative" ref={notifRef}>
             <button
               type="button"
-              aria-label={`Open staff notifications, ${unreadCount} active`}
+              aria-label={`Open staff notifications, ${activeCount} active and ${unreadCount} unread`}
               onClick={() => {
                 setNotifOpen((current) => !current);
                 setProfileOpen(false);
@@ -201,8 +219,10 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               className="relative material-symbols-outlined rounded-full p-1.5 text-gray-600 transition hover:bg-gray-50"
             >
               notifications
-              {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[10px] font-mono leading-4 text-white">
+              {activeCount > 0 && (
+                <span
+                  className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-[10px] font-mono leading-4 text-white"
+                >
                   {notificationCountLabel}
                 </span>
               )}
@@ -214,7 +234,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                   <div>
                     <p className="text-xs font-bold text-gray-500">Notifications</p>
                     <p className="mt-0.5 text-[10px] font-semibold text-outline">
-                      {unreadCount} active alert(s)
+                      {activeCount} active · {unreadCount} unread
                     </p>
                   </div>
                   <Link

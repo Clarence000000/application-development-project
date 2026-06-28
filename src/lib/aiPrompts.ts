@@ -10,6 +10,7 @@ type BuildAiPromptInput = {
   message?: string;
   conversation?: { role: "assistant" | "user"; text: string }[];
   currentRemarks?: string;
+  targetStatus?: string;
 };
 
 const systemInstruction = `
@@ -84,6 +85,7 @@ export function buildAiPrompt({
   message,
   conversation,
   currentRemarks,
+  targetStatus,
 }: BuildAiPromptInput) {
   if (task === "chatbot") {
     const conversationContext =
@@ -139,14 +141,27 @@ ${applicationJson}
     return `${systemInstruction}
 
 Task: Suggest possible missing documents or information.
-Return:
-- A short list of missing/weak information.
-- Suggested document or clarification request for each item.
-- A polite applicant-facing request message staff can paste.
+Return a compact staff-scannable checklist only. Keep the full answer under
+120 words.
 
-Do not claim a document is legally mandatory. Phrase as "may be required" or
-"staff may request".
-Do not use markdown tables.
+Use exactly this structure:
+
+## Missing / Weak Items
+- Max 3 bullets. Name the weak field and the issue.
+
+## Suggested Staff Request
+- Max 3 bullets. Say what staff should ask the applicant to provide.
+
+## Applicant Message
+One short paragraph staff can paste. Do not write a formal letter with greeting,
+signature, reference number, or thank-you closing.
+
+Rules:
+- Do not claim a document is legally mandatory. Say "may be requested" or
+  "supporting proof such as...".
+- Do not tell applicants to upload files or use a portal upload area.
+- Do not include long explanations, repeated details, or email-style formatting.
+- Do not use markdown tables.
 
 Application data:
 ${applicationJson}
@@ -157,11 +172,18 @@ ${applicationJson}
 
 Task: Draft a staff remark.
 Write a concise professional remark that staff can paste into the New Remark box.
-Use the current remark if provided, otherwise infer a safe review remark from the
-application data. Do not approve or reject unless the current remark says so.
+Draft specifically for the staff's intended decision/status below. It is safe to
+refer to that decision because staff selected that exact action. Do not mention a
+different decision/status.
+Return only the remark text itself. Do not include labels, prefixes, headings,
+quotes, or explanatory preambles such as "Staff Remark:" or "The following
+remark is drafted...".
 
 Current staff remark:
 ${currentRemarks || "None"}
+
+Target decision/status:
+${targetStatus || "Not specified"}
 
 Application data:
 ${applicationJson}

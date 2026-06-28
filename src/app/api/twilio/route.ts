@@ -135,11 +135,11 @@ async function updateSmsDeliveryStatus(
     return;
   }
 
-  await updateDoc(doc(db, "notifications", notificationId), {
+  await setDoc(doc(db, "notifications", notificationId), {
     smsStatus: deliveryStatus,
     smsRecipient: typeof recipient === "string" ? formatToE164(recipient) : null,
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true });
 }
 
 async function getSmsPreferences(uid: string) {

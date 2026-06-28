@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
     message: readString(body.message),
     conversation: readConversation(body.conversation),
     currentRemarks: readString(body.currentRemarks),
+    targetStatus: readString(body.targetStatus),
   });
 
   try {

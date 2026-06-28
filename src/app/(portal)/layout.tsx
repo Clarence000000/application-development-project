@@ -72,7 +72,7 @@ export default function PortalLayout({
       unsubscribeNotifications?.();
       unsubscribeNotifications = subscribeNotificationHistory(
         user.uid,
-        (history) => setNotifications(history.slice(0, 4)),
+        (history) => setNotifications(history.slice(0, 99)),
         (error) => console.error("Notification dropdown listener failed", error),
       );
     });

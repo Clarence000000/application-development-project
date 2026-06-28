@@ -42,26 +42,19 @@ export default function AiHelpChat() {
   }, []);
 
   const updateMarkerPositions = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const maxScroll = container.scrollHeight - container.clientHeight;
-    const nextPositions = messages.reduce<Record<string, number>>(
+    const userMessageList = messages.filter((message) => message.role === "user");
+    const lastIndex = userMessageList.length - 1;
+    const nextPositions = userMessageList.reduce<Record<string, number>>(
       (positions, message) => {
-        if (message.role !== "user") {
-          return positions;
-        }
-
-        const target = getMessageScrollTarget(message.id);
-        positions[message.id] =
-          target !== null && maxScroll > 0 ? (target / maxScroll) * 100 : 100;
+        const index = userMessageList.findIndex((item) => item.id === message.id);
+        positions[message.id] = lastIndex <= 0 ? 100 : (index / lastIndex) * 100;
         return positions;
       },
       {},
     );
 
     setMarkerPositions(nextPositions);
-  }, [getMessageScrollTarget, messages]);
+  }, [messages]);
 
   const updateScrollState = useCallback(() => {
     const container = scrollRef.current;

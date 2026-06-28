@@ -49,12 +49,7 @@ type ApplicationRecord = {
   pendingDays: number;
 };
 
-type AiReviewTask = "staff_summary" | "missing_documents" | "draft_remark";
-
-const currentStaff = {
-  name: "Staff Mukim Ayer Hitam",
-  assignedDistrict: "Mukim Ayer Hitam",
-};
+type AiReviewTask = "staff_summary" | "missing_documents";
 
 const statusStyles: Record<
   ApprovalStatus,
@@ -96,28 +91,44 @@ export default function ApprovalReviewPage() {
     "All",
   );
   const [search, setSearch] = useState("");
-  const [remarks, setRemarks] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [staffDistrict, setStaffDistrict] = useState(
-    currentStaff.assignedDistrict,
-  );
-  const [staffName, setStaffName] = useState(currentStaff.name);
-  const [staffRole, setStaffRole] = useState<UserRole>("Admin");
+  const [staffDistrict, setStaffDistrict] = useState("");
+  const [staffName, setStaffName] = useState("");
+  const [staffRole, setStaffRole] = useState<UserRole | null>(null);
   const [aiLoadingTask, setAiLoadingTask] = useState<AiReviewTask | null>(null);
   const [aiResult, setAiResult] = useState("");
   const [aiError, setAiError] = useState("");
+  const [pendingDecisionStatus, setPendingDecisionStatus] =
+    useState<ApprovalStatus | null>(null);
+  const [decisionRemark, setDecisionRemark] = useState("");
+  const [decisionAiLoading, setDecisionAiLoading] = useState(false);
+  const [decisionAiError, setDecisionAiError] = useState("");
 
   const isSuperAdmin = staffRole === "SuperAdmin";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        setStaffRole(null);
+        setStaffDistrict("");
+        setStaffName("");
+        setApplications([]);
+        setIsLoading(false);
+        return;
+      }
 
       try {
         const staffSnapshot = await getDoc(doc(db, "users", user.uid));
-        if (!staffSnapshot.exists()) return;
+        if (!staffSnapshot.exists()) {
+          setStaffRole(null);
+          setStaffDistrict("");
+          setStaffName("");
+          setApplications([]);
+          setIsLoading(false);
+          return;
+        }
 
         const staffData = staffSnapshot.data();
         const district = readString(staffData.district);
@@ -130,15 +141,12 @@ export default function ApprovalReviewPage() {
 
         setStaffRole(role);
 
-        if (district) {
-          setStaffDistrict(district);
-        }
+        setStaffDistrict(district);
 
-        if (name) {
-          setStaffName(name);
-        }
+        setStaffName(name || user.email || "Staff");
       } catch (error) {
         console.error("Failed to load staff district", error);
+        setIsLoading(false);
       }
     });
 
@@ -146,6 +154,12 @@ export default function ApprovalReviewPage() {
   }, []);
 
   useEffect(() => {
+    if (!staffRole || (!isSuperAdmin && !staffDistrict)) {
+      setApplications([]);
+      setIsLoading(!staffRole);
+      return;
+    }
+
     let isActive = true;
     setIsLoading(true);
 
@@ -222,7 +236,7 @@ export default function ApprovalReviewPage() {
       isActive = false;
       unsubscribe();
     };
-  }, [isSuperAdmin, staffDistrict]);
+  }, [isSuperAdmin, staffDistrict, staffRole]);
 
   const selectedApplication = applications.find(
     (application) => application.documentId === selectedId,
@@ -246,6 +260,9 @@ export default function ApprovalReviewPage() {
     setAiLoadingTask(null);
     setAiResult("");
     setAiError("");
+    setPendingDecisionStatus(null);
+    setDecisionRemark("");
+    setDecisionAiError("");
   }, [selectedId]);
 
   const assignedApplications = useMemo(() => applications, [applications]);
@@ -296,7 +313,10 @@ export default function ApprovalReviewPage() {
     !selectedApplication ||
     isDecisionActionDisabled(selectedApplication.status, "reject");
 
-  const updateStatus = async (nextStatus: ApprovalStatus) => {
+  const updateStatus = async (
+    nextStatus: ApprovalStatus,
+    remarkOverride?: string,
+  ) => {
     if (!selectedApplication) return;
 
     const action = getDecisionAction(nextStatus);
@@ -307,7 +327,7 @@ export default function ApprovalReviewPage() {
       return;
     }
 
-    const note = remarks.trim();
+    const note = (remarkOverride ?? "").trim();
 
     try {
       setIsUpdating(true);
@@ -361,7 +381,7 @@ export default function ApprovalReviewPage() {
             .join(" and ")} notification failed.`,
         );
       }
-      setRemarks("");
+      closeDecisionModal();
     } catch (error) {
       console.error("Failed to update application status", error);
       showToast("Application status could not be updated.");
@@ -370,12 +390,13 @@ export default function ApprovalReviewPage() {
     }
   };
 
-  const requestMissingDocument = async () => {
+  const requestMissingDocument = async (remarkOverride?: string) => {
     if (!selectedApplication) return;
 
-    const note =
-      remarks.trim() ||
-      `Additional documents are required for your ${selectedApplication.formName} application (${selectedApplication.id}). Please review the request and upload the required document.`;
+    const note = (remarkOverride ?? "").trim();
+    const applicantMessage =
+      note ||
+      `Please review your ${selectedApplication.formName} application (${selectedApplication.id}) because the office needs additional information or documents.`;
 
     try {
       setIsUpdating(true);
@@ -383,14 +404,14 @@ export default function ApprovalReviewPage() {
         status: "Action Required",
         staffVetted: true,
         staffVettedAt: serverTimestamp(),
-        officeComment: note,
+        officeComment: note || null,
         actionRequiredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       const notificationId = await createInAppNotification({
         uid: selectedApplication.uid,
         title: "Action Required",
-        message: note,
+        message: applicantMessage,
         applicationId: selectedApplication.documentId,
         referenceNumber: selectedApplication.id,
         applicationTitle: selectedApplication.formName,
@@ -407,7 +428,7 @@ export default function ApprovalReviewPage() {
           applicationTitle: selectedApplication.formName,
           eventType: "document_requested",
           status: "Action Required",
-          message: note,
+          message: applicantMessage,
           actionUrl: `/review-status?focus=${encodeURIComponent(selectedApplication.id)}`,
         });
         showToast(
@@ -417,7 +438,7 @@ export default function ApprovalReviewPage() {
         console.warn("Missing document email notification failed", emailError);
         showToast(`${selectedApplication.id} updated, but email failed.`);
       }
-      setRemarks("");
+      closeDecisionModal();
     } catch (error) {
       console.error("Failed to request missing document", error);
       showToast("Missing document request could not be sent.");
@@ -425,6 +446,72 @@ export default function ApprovalReviewPage() {
       setIsUpdating(false);
     }
   };
+
+  function openDecisionModal(nextStatus: ApprovalStatus) {
+    setPendingDecisionStatus(nextStatus);
+    setDecisionRemark("");
+    setDecisionAiError("");
+  }
+
+  function closeDecisionModal() {
+    setPendingDecisionStatus(null);
+    setDecisionRemark("");
+    setDecisionAiError("");
+    setDecisionAiLoading(false);
+  }
+
+  async function generateDecisionRemark() {
+    if (!selectedApplication || !pendingDecisionStatus) return;
+
+    try {
+      setDecisionAiLoading(true);
+      setDecisionAiError("");
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          task: "draft_remark",
+          application: selectedApplication,
+          currentRemarks: decisionRemark,
+          targetStatus: pendingDecisionStatus,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        text?: string;
+        error?: string;
+      } | null;
+
+      if (!response.ok || !data?.text) {
+        throw new Error(
+          data?.error || "AI assistant could not generate a draft remark.",
+        );
+      }
+
+      setDecisionRemark(toDecisionRemark(data.text));
+    } catch (error) {
+      console.error("Decision remark AI draft failed", error);
+      setDecisionAiError(
+        error instanceof Error
+          ? error.message
+          : "AI assistant could not generate a draft remark.",
+      );
+    } finally {
+      setDecisionAiLoading(false);
+    }
+  }
+
+  async function confirmDecision() {
+    if (!pendingDecisionStatus) return;
+
+    if (pendingDecisionStatus === "Action Required") {
+      await requestMissingDocument(decisionRemark);
+      return;
+    }
+
+    await updateStatus(pendingDecisionStatus, decisionRemark);
+  }
 
   const runAiReview = async (task: AiReviewTask) => {
     if (!selectedApplication) return;
@@ -440,7 +527,6 @@ export default function ApprovalReviewPage() {
         body: JSON.stringify({
           task,
           application: selectedApplication,
-          currentRemarks: remarks,
         }),
       });
       const data = (await response.json().catch(() => null)) as {
@@ -758,7 +844,6 @@ export default function ApprovalReviewPage() {
             aria-label="Close application detail"
             onClick={() => {
               setSelectedId(null);
-              setRemarks("");
             }}
           />
           <section className="relative flex h-full w-full max-w-5xl flex-col bg-white shadow-2xl">
@@ -778,7 +863,6 @@ export default function ApprovalReviewPage() {
                 className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container"
                 onClick={() => {
                   setSelectedId(null);
-                  setRemarks("");
                 }}
               >
                 close
@@ -845,25 +929,15 @@ export default function ApprovalReviewPage() {
                   </div>
                 </section>
 
-                <section className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr]">
+                <section>
                   <div>
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
                       Review Notes
                     </h3>
                     <div className="min-h-24 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface">
-                      {selectedApplication.supportingNotes}
+                      {selectedApplication.supportingNotes ||
+                        "No office remarks recorded yet."}
                     </div>
-                  </div>
-                  <div>
-                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-                      New Remark
-                    </h3>
-                    <textarea
-                      className="min-h-32 w-full rounded-lg border border-outline bg-white p-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                      placeholder="Record staff remarks before updating the decision"
-                      value={remarks}
-                      onChange={(event) => setRemarks(event.target.value)}
-                    />
                   </div>
                 </section>
               </div>
@@ -926,13 +1000,6 @@ export default function ApprovalReviewPage() {
                       disabled={Boolean(aiLoadingTask)}
                       onClick={() => runAiReview("missing_documents")}
                     />
-                    <AiActionButton
-                      icon="edit_note"
-                      label="Draft Remark"
-                      loading={aiLoadingTask === "draft_remark"}
-                      disabled={Boolean(aiLoadingTask)}
-                      onClick={() => runAiReview("draft_remark")}
-                    />
                   </div>
                   {aiError && (
                     <p className="mt-3 rounded-lg border border-error bg-error-container p-2 text-xs font-semibold text-on-error-container">
@@ -942,16 +1009,6 @@ export default function ApprovalReviewPage() {
                   {aiResult && (
                     <div className="mt-3 rounded-lg border border-outline-variant bg-white p-3">
                       <FormattedAiText text={aiResult} />
-                      <button
-                        type="button"
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
-                        onClick={() => setRemarks(toPlainRemark(aiResult))}
-                      >
-                        <span className="material-symbols-outlined text-[16px]">
-                          content_paste
-                        </span>
-                        Use as Remark
-                      </button>
                     </div>
                   )}
                 </section>
@@ -966,32 +1023,126 @@ export default function ApprovalReviewPage() {
                       label="Mark as Staff Vetted"
                       tone="outline"
                       disabled={isUpdating || staffVettedDisabled}
-                      onClick={() => updateStatus("Staff Vetted")}
+                      onClick={() => openDecisionModal("Staff Vetted")}
                     />
                     <DecisionActionButton
                       icon="upload_file"
                       label="Request Missing Document"
                       tone="warning"
                       disabled={isUpdating}
-                      onClick={requestMissingDocument}
+                      onClick={() => openDecisionModal("Action Required")}
                     />
                     <DecisionActionButton
                       icon="verified"
                       label="Approve"
                       tone="approve"
                       disabled={isUpdating || approveDisabled}
-                      onClick={() => updateStatus("Approved")}
+                      onClick={() => openDecisionModal("Approved")}
                     />
                     <DecisionActionButton
                       icon="cancel"
                       label="Reject"
                       tone="reject"
                       disabled={isUpdating || rejectDisabled}
-                      onClick={() => updateStatus("Rejected")}
+                      onClick={() => openDecisionModal("Rejected")}
                     />
                   </div>
                 </section>
               </aside>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {selectedApplication && pendingDecisionStatus && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+          <section className="w-full max-w-lg rounded-lg border border-outline-variant bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-outline-variant px-4 py-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-outline">
+                  {selectedApplication.id}
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-primary">
+                  {getDecisionModalTitle(pendingDecisionStatus)}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                  Add a remark manually, generate an AI draft for this exact
+                  decision, or continue with an empty remark.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container"
+                disabled={isUpdating}
+                onClick={closeDecisionModal}
+              >
+                close
+              </button>
+            </div>
+
+            <div className="space-y-3 px-4 py-4">
+              <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                  Target Status
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusBadge status={pendingDecisionStatus} />
+                  <span className="text-xs font-medium text-on-surface-variant">
+                    AI drafts will be written for this selected status only.
+                  </span>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
+                  Remark
+                </span>
+                <textarea
+                  className="min-h-36 w-full rounded-lg border border-outline bg-white p-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                  placeholder="Leave empty or generate a draft remark"
+                  value={decisionRemark}
+                  onChange={(event) => setDecisionRemark(event.target.value)}
+                />
+              </label>
+
+              {decisionAiError && (
+                <p className="rounded-lg border border-error bg-error-container p-2 text-xs font-semibold text-on-error-container">
+                  {decisionAiError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-outline-variant px-4 py-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-outline bg-white px-4 py-2 text-xs font-bold text-primary transition hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isUpdating || decisionAiLoading}
+                onClick={closeDecisionModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-white px-4 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isUpdating || decisionAiLoading}
+                onClick={generateDecisionRemark}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {decisionAiLoading ? "progress_activity" : "edit_note"}
+                </span>
+                {decisionAiLoading ? "Generating..." : "Generate Draft"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isUpdating || decisionAiLoading}
+                onClick={confirmDecision}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  check_circle
+                </span>
+                Confirm {pendingDecisionStatus}
+              </button>
             </div>
           </section>
         </div>
@@ -1148,7 +1299,7 @@ function buildApplicationStatusUpdate(
       status: "Rejected",
       staffVetted: true,
       rejectedAt: serverTimestamp(),
-      rejectionReason: remarks || "Application rejected by the office.",
+      rejectionReason: remarks || null,
       approvedAt: null,
       approvedBy: null,
       approvedByUid: null,
@@ -1193,7 +1344,7 @@ function mapApplicationRecord(
         application.district,
         application.district,
         application.meta,
-      ) || currentStaff.assignedDistrict,
+      ) || "Unassigned District",
     status,
     purpose: readString(values.purpose, values.appealReason) || "-",
     address:
@@ -1210,7 +1361,7 @@ function mapApplicationRecord(
         application.officeComment,
         application.rejectionReason,
         application.staffComment,
-      ) || "No staff remarks recorded yet.",
+      ) || "",
     sortTime: submittedAt?.getTime() || 0,
     isUrgent,
     pendingDays,
@@ -1263,6 +1414,9 @@ function mapApprovalStatus(
   if (status === "approved") return "Approved";
   if (status === "rejected") return "Rejected";
   if (status === "action required") return "Action Required";
+  if (status === "in review" || status === "pending review") {
+    return "Pending Review";
+  }
   if (application.staffVetted === true) return "Staff Vetted";
 
   return "Pending Review";
@@ -1346,6 +1500,18 @@ function StatusBadge({ status }: { status: ApprovalStatus }) {
       {status}
     </span>
   );
+}
+
+function getDecisionModalTitle(status: ApprovalStatus) {
+  if (status === "Action Required") {
+    return "Request Missing Document";
+  }
+
+  if (status === "Staff Vetted") {
+    return "Mark as Staff Vetted";
+  }
+
+  return `${status} Application`;
 }
 
 type DecisionAction = "staff_vetted" | "approve" | "reject";
@@ -1561,6 +1727,24 @@ function toPlainRemark(text: string) {
         .replace(/^\d+\.\s+/, "")
         .replace(/\*\*([^*]+)\*\*/g, "$1");
     })
+    .join("\n");
+}
+
+function toDecisionRemark(text: string) {
+  return toPlainRemark(text)
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^staff\s+remark\s*:\s*/i, "")
+        .replace(/^remark\s*:\s*/i, "")
+        .trim(),
+    )
+    .filter(
+      (line) =>
+        line &&
+        !/^the following remark/i.test(line) &&
+        !/^drafted remark/i.test(line),
+    )
     .join("\n");
 }
 
