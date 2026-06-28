@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import { useSearchParams } from "next/navigation";
 import {
   collection,
   doc,
@@ -45,7 +46,10 @@ type ApplicationRecord = {
   sortTime: number;
   timeline: { title: string; date: string; done: boolean }[];
   isUrgent: boolean; // For reprioritization
+  pendingDays: number;
 };
+
+type AiReviewTask = "staff_summary" | "missing_documents" | "draft_remark";
 
 const currentStaff = {
   name: "Staff Mukim Ayer Hitam",
@@ -81,6 +85,8 @@ const statusStyles: Record<ApprovalStatus, { badge: string; dot: string; icon: s
 };
 
 export default function ApprovalReviewPage() {
+  const searchParams = useSearchParams();
+  const focusedReference = searchParams.get("focus");
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"All" | ApprovalStatus>("All");
@@ -92,6 +98,9 @@ export default function ApprovalReviewPage() {
   const [staffDistrict, setStaffDistrict] = useState(currentStaff.assignedDistrict);
   const [staffName, setStaffName] = useState(currentStaff.name);
   const [staffRole, setStaffRole] = useState<UserRole>("Admin");
+  const [aiLoadingTask, setAiLoadingTask] = useState<AiReviewTask | null>(null);
+  const [aiResult, setAiResult] = useState("");
+  const [aiError, setAiError] = useState("");
 
   const isSuperAdmin = staffRole === "SuperAdmin";
 
@@ -207,6 +216,26 @@ export default function ApprovalReviewPage() {
     (application) => application.documentId === selectedId,
   );
 
+  useEffect(() => {
+    if (!focusedReference || applications.length === 0) return;
+
+    const focusedApplication = applications.find(
+      (application) =>
+        application.id === focusedReference ||
+        application.documentId === focusedReference,
+    );
+
+    if (focusedApplication) {
+      setSelectedId(focusedApplication.documentId);
+    }
+  }, [applications, focusedReference]);
+
+  useEffect(() => {
+    setAiLoadingTask(null);
+    setAiResult("");
+    setAiError("");
+  }, [selectedId]);
+
   const assignedApplications = useMemo(() => applications, [applications]);
 
   const filteredApplications = useMemo(() => {
@@ -261,19 +290,32 @@ export default function ApprovalReviewPage() {
             eventType: "status_updated",
           })
         : null;
-      const notificationResults = await Promise.allSettled([
-        triggerDecisionEmail(selectedApplication, nextStatus, note, notificationId),
-        triggerDecisionSms(selectedApplication, nextStatus, notificationId),
+      const notificationResults = await Promise.all([
+        triggerDecisionEmail(
+          selectedApplication,
+          nextStatus,
+          note,
+          notificationId,
+        )
+          .then(() => ({ channel: "email", failed: false }))
+          .catch((error) => ({ channel: "email", failed: true, error })),
+        triggerDecisionSms(selectedApplication, nextStatus, notificationId)
+          .then(() => ({ channel: "SMS", failed: false }))
+          .catch((error) => ({ channel: "SMS", failed: true, error })),
       ]);
       const failedNotifications = notificationResults.filter(
-        (result) => result.status === "rejected",
+        (result) => result.failed,
       );
 
       if (failedNotifications.length === 0) {
         showToast(`${selectedApplication.id} updated to ${nextStatus}.`);
       } else {
-        console.error("Some decision notifications failed", failedNotifications);
-        showToast(`${selectedApplication.id} updated, but notification failed.`);
+        console.warn("Decision notification channel failed", failedNotifications);
+        showToast(
+          `${selectedApplication.id} updated, but ${failedNotifications
+            .map((result) => result.channel)
+            .join(" and ")} notification failed.`,
+        );
       }
       setRemarks("");
     } catch (error) {
@@ -326,7 +368,7 @@ export default function ApprovalReviewPage() {
         });
         showToast(`${selectedApplication.id} missing document request recorded.`);
       } catch (emailError) {
-        console.error("Failed to send missing document notification", emailError);
+        console.warn("Missing document email notification failed", emailError);
         showToast(`${selectedApplication.id} updated, but email failed.`);
       }
       setRemarks("");
@@ -335,6 +377,45 @@ export default function ApprovalReviewPage() {
       showToast("Missing document request could not be sent.");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const runAiReview = async (task: AiReviewTask) => {
+    if (!selectedApplication) return;
+
+    try {
+      setAiLoadingTask(task);
+      setAiError("");
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          task,
+          application: selectedApplication,
+          currentRemarks: remarks,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        text?: string;
+        error?: string;
+      } | null;
+
+      if (!response.ok || !data?.text) {
+        throw new Error(data?.error || "AI assistant could not generate a response.");
+      }
+
+      setAiResult(data.text);
+    } catch (error) {
+      console.error("AI review assistant failed", error);
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "AI assistant could not generate a response.",
+      );
+    } finally {
+      setAiLoadingTask(null);
     }
   };
 
@@ -347,9 +428,6 @@ export default function ApprovalReviewPage() {
     <div className="space-y-4">
       <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-            Staff Workspace
-          </p>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-primary">
             Approval Review
           </h1>
@@ -532,6 +610,12 @@ export default function ApprovalReviewPage() {
                         {application.id}
                       </span>
                       <StatusBadge status={application.status} />
+                      {application.isUrgent && (
+                        <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
+                          <span className="material-symbols-outlined text-[11px]">warning</span>
+                          &gt;3 Days Overdue
+                        </span>
+                      )}
                     </div>
                     <h2 className="mt-1 truncate text-sm font-bold text-on-surface">
                       {application.applicantName}
@@ -695,6 +779,53 @@ export default function ApprovalReviewPage() {
                       </div>
                     ))}
                   </div>
+                </section>
+
+                <section className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-primary">
+                    AI Review Assistant
+                  </h3>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <AiActionButton
+                      icon="summarize"
+                      label="Generate Summary"
+                      loading={aiLoadingTask === "staff_summary"}
+                      disabled={Boolean(aiLoadingTask)}
+                      onClick={() => runAiReview("staff_summary")}
+                    />
+                    <AiActionButton
+                      icon="plagiarism"
+                      label="Suggest Missing Docs"
+                      loading={aiLoadingTask === "missing_documents"}
+                      disabled={Boolean(aiLoadingTask)}
+                      onClick={() => runAiReview("missing_documents")}
+                    />
+                    <AiActionButton
+                      icon="edit_note"
+                      label="Draft Remark"
+                      loading={aiLoadingTask === "draft_remark"}
+                      disabled={Boolean(aiLoadingTask)}
+                      onClick={() => runAiReview("draft_remark")}
+                    />
+                  </div>
+                  {aiError && (
+                    <p className="mt-3 rounded-lg border border-error bg-error-container p-2 text-xs font-semibold text-on-error-container">
+                      {aiError}
+                    </p>
+                  )}
+                  {aiResult && (
+                    <div className="mt-3 rounded-lg border border-outline-variant bg-white p-3">
+                      <FormattedAiText text={aiResult} />
+                      <button
+                        type="button"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
+                        onClick={() => setRemarks(toPlainRemark(aiResult))}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">content_paste</span>
+                        Use as Remark
+                      </button>
+                    </div>
+                  )}
                 </section>
 
                 <section className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
@@ -910,12 +1041,10 @@ function mapApplicationRecord(
   const status = mapApprovalStatus(application);
   const submittedDate = formatFirestoreDate(application.submittedAt);
   const submittedAt = toDate(application.submittedAt);
-  let isUrgent = false;
-  if (submittedAt && status !== "Approved" && status !== "Rejected") {
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    isUrgent = submittedAt < threeDaysAgo;
-  }
+  const pendingDays = submittedAt
+    ? Math.floor((Date.now() - submittedAt.getTime()) / 86_400_000)
+    : 0;
+  const isUrgent = status === "Pending Review" && pendingDays >= 3;
   const staffVettedAt = formatFirestoreDate(application.staffVettedAt);
   const approvedAt = formatFirestoreDate(application.approvedAt);
   const rejectedAt = formatFirestoreDate(application.rejectedAt);
@@ -955,6 +1084,7 @@ function mapApplicationRecord(
       ) || "No staff remarks recorded yet.",
     sortTime: submittedAt?.getTime() || 0,
     isUrgent,
+    pendingDays,
     timeline: [
       {
         title: "Application Submitted",
@@ -1075,6 +1205,157 @@ function StatusBadge({ status }: { status: ApprovalStatus }) {
       {status}
     </span>
   );
+}
+
+function AiActionButton({
+  icon,
+  label,
+  loading,
+  disabled,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  loading: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="material-symbols-outlined text-[16px]">
+        {loading ? "progress_activity" : icon}
+      </span>
+      {loading ? "Generating..." : label}
+    </button>
+  );
+}
+
+function FormattedAiText({ text }: { text: string }) {
+  return (
+    <div className="space-y-1 text-xs leading-5 text-on-surface">
+      {text.split("\n").map((line, index) => {
+        const trimmedLine = line.trim();
+        const key = `${index}-${trimmedLine}`;
+
+        if (!trimmedLine) {
+          return <div key={key} className="h-1" />;
+        }
+
+        if (/^-{3,}$/.test(trimmedLine)) {
+          return <hr key={key} className="my-2 border-outline-variant" />;
+        }
+
+        const headingMatch = trimmedLine.match(/^#{1,6}\s+(.+)$/);
+        if (headingMatch) {
+          return (
+            <h3 key={key} className="pt-1 text-sm font-bold text-primary">
+              {renderInlineFormatting(headingMatch[1])}
+            </h3>
+          );
+        }
+
+        if (isMarkdownTableSeparator(trimmedLine)) {
+          return null;
+        }
+
+        if (isMarkdownTableRow(trimmedLine)) {
+          const cells = parseMarkdownTableRow(trimmedLine);
+
+          return (
+            <div
+              key={key}
+              className="grid grid-cols-1 gap-1 rounded-md border border-outline-variant bg-surface-container-low p-2 sm:grid-cols-2"
+            >
+              {cells.map((cell, cellIndex) => (
+                <div
+                  key={`${key}-${cellIndex}`}
+                  className={cellIndex === 0 ? "font-bold" : ""}
+                >
+                  {renderInlineFormatting(cell)}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        const bulletMatch = trimmedLine.match(/^[-*]\s+(.+)$/);
+        if (bulletMatch) {
+          return (
+            <p key={key} className="flex gap-2">
+              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-current" />
+              <span>{renderInlineFormatting(bulletMatch[1])}</span>
+            </p>
+          );
+        }
+
+        const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+        if (numberedMatch) {
+          return (
+            <p key={key} className="flex gap-2">
+              <span className="shrink-0 font-bold">{numberedMatch[1]}.</span>
+              <span>{renderInlineFormatting(numberedMatch[2])}</span>
+            </p>
+          );
+        }
+
+        return <p key={key}>{renderInlineFormatting(trimmedLine)}</p>;
+      })}
+    </div>
+  );
+}
+
+function isMarkdownTableRow(line: string) {
+  return line.includes("|") && parseMarkdownTableRow(line).length > 1;
+}
+
+function isMarkdownTableSeparator(line: string) {
+  return /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(line);
+}
+
+function parseMarkdownTableRow(line: string) {
+  return line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+}
+
+function renderInlineFormatting(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+  });
+}
+
+function toPlainRemark(text: string) {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^-{3,}$/.test(line))
+    .filter((line) => !isMarkdownTableSeparator(line))
+    .map((line) => {
+      if (isMarkdownTableRow(line)) {
+        return parseMarkdownTableRow(line).join(": ");
+      }
+
+      return line
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^[-*]\s+/, "")
+        .replace(/^\d+\.\s+/, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1");
+    })
+    .join("\n");
 }
 
 function DetailItem({

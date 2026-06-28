@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import AiHelpChat from "@/components/AiHelpChat";
 import {
   formatNotificationDate,
   subscribeNotificationHistory,
@@ -473,6 +474,8 @@ export default function PortalLayout({
           );
         })}
       </nav>
+
+      <AiHelpChat />
     </div>
   );
 }

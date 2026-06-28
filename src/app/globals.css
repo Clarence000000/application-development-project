@@ -38,3 +38,12 @@ body {
   color: var(--color-on-background);
   font-family: var(--font-public-sans);
 }
+
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

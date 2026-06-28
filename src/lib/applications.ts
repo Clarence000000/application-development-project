@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -148,15 +149,25 @@ export async function saveDraftApplicationDocument({
   const applicationRef = applicationId
     ? doc(db, "applications", applicationId)
     : doc(collection(db, "applications"));
-  const existingSnapshot = await getDoc(applicationRef);
-  const existingData = existingSnapshot.exists() ? existingSnapshot.data() : {};
-  const referenceNumber =
-    readString(existingData.referenceNumber) || generateReferenceNumber();
-  const district = values.district;
+  const result = await runTransaction(db, async (transaction) => {
+    const existingSnapshot = await transaction.get(applicationRef);
+    const existingData = existingSnapshot.exists() ? existingSnapshot.data() : {};
+    const existingStatus = readString(existingData.status);
+    const referenceNumber =
+      readString(existingData.referenceNumber) || generateReferenceNumber();
 
-  await setDoc(
-    applicationRef,
-    {
+    if (existingStatus && existingStatus !== "Draft") {
+      return {
+        applicationId: applicationRef.id,
+        referenceNumber,
+      };
+    }
+
+    const district = values.district;
+
+    transaction.set(
+      applicationRef,
+      {
       applicationId: applicationRef.id,
       referenceNumber,
       uid,
@@ -180,14 +191,17 @@ export async function saveDraftApplicationDocument({
       officeComment: null,
       rejectedAt: null,
       rejectionReason: null,
-    },
-    { merge: true },
-  );
+      },
+      { merge: true },
+    );
 
-  return {
-    applicationId: applicationRef.id,
-    referenceNumber,
-  };
+    return {
+      applicationId: applicationRef.id,
+      referenceNumber,
+    };
+  });
+
+  return result;
 }
 
 export async function getLatestDraftApplication({

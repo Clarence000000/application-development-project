@@ -127,8 +127,9 @@ export async function triggerEmailNotification(
         deliveryStatus: "disabled" as const,
       };
     }
-  } catch (error) {
-    console.warn("Could not precheck email notification preferences", error);
+  } catch {
+    // Staff users cannot read another user's preferences from the client SDK.
+    // The server route repeats this check with Firebase Admin credentials.
   }
 
   const response = await fetch("/api/notifications/email", {

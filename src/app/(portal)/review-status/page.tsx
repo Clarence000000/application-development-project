@@ -33,6 +33,7 @@ interface Application {
   link?: string;
   downloadUrl?: string;
   serialNumber?: string;
+  officeRemark?: string;
   timeline: { title: string; date: string; desc: string; done: boolean }[];
 }
 
@@ -593,6 +594,17 @@ function ReviewStatusContent() {
                 )}
               </div>
 
+              {selectedApp.officeRemark && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
+                    Office Remark
+                  </h4>
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low p-3 text-sm leading-6 text-on-surface">
+                    <FormattedOfficeRemark text={selectedApp.officeRemark} />
+                  </div>
+                </div>
+              )}
+
               {/* Application Details Summary */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
@@ -718,14 +730,19 @@ function mapFirestoreApplication(
   id: string,
   data: Record<string, unknown>,
 ): Application & { sortTime: number } {
-  const status = mapStatus(data.status);
+  const submittedDate = toDate(data.submittedAt);
+  const status = mapStatus(data.status, submittedDate);
   const submittedAt = formatFirestoreDate(data.submittedAt);
   const updatedAt = formatFirestoreDate(data.updatedAt);
   const approvedAt = formatFirestoreDate(data.approvedAt);
   const rejectedAt = formatFirestoreDate(data.rejectedAt);
-  const submittedDate = toDate(data.submittedAt);
   const updatedDate = toDate(data.updatedAt);
   const serialNumber = readString(data.serialNumber);
+  const officeRemark = readString(
+    data.officeComment,
+    data.rejectionReason,
+    data.staffComment,
+  );
   const formSlug = readString(data.formSlug) || readString(data.type);
   const title =
     readString(data.formType) || readString(data.title) || "Office Application";
@@ -748,6 +765,7 @@ function mapFirestoreApplication(
     ...statusStyle(status),
     link: status === "Draft" ? getApplicationHref(formSlug) : undefined,
     serialNumber: serialNumber || undefined,
+    officeRemark: officeRemark || undefined,
     downloadUrl:
       status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
     warning:
@@ -806,13 +824,16 @@ function buildTimeline(
   ];
 }
 
-function mapStatus(value: unknown): Application["status"] {
+function mapStatus(
+  value: unknown,
+  submittedAt: Date | null = null,
+): Application["status"] {
   const status = readString(value).toLowerCase();
   if (status === "approved") return "Approved";
   if (status === "rejected") return "Rejected";
   if (status === "in review") return "In Review";
   if (status === "action required") return "Action Required";
-  if (status === "draft") return "Draft";
+  if (status === "draft") return submittedAt ? "In Review" : "Draft";
   return "In Review";
 }
 
@@ -870,6 +891,31 @@ function statusStyle(status: Application["status"]) {
     statusBg: "bg-secondary-container",
     statusDot: "bg-on-secondary-container",
   };
+}
+
+function FormattedOfficeRemark({ text }: { text: string }) {
+  return (
+    <div className="space-y-2">
+      {text.split("\n").map((line, index) => {
+        const cleanedLine = cleanRemarkLine(line);
+
+        if (!cleanedLine) {
+          return null;
+        }
+
+        return <p key={`${index}-${cleanedLine}`}>{cleanedLine}</p>;
+      })}
+    </div>
+  );
+}
+
+function cleanRemarkLine(line: string) {
+  return line
+    .trim()
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^[-*]\s+/, "")
+    .replace(/^\d+\.\s+/, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1");
 }
 
 function formatFirestoreDate(value: unknown) {
