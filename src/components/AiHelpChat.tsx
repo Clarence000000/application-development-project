@@ -8,17 +8,33 @@ type ChatMessage = {
   text: string;
 };
 
-const introMessage =
+type AiHelpChatProps = {
+  audience?: "applicant" | "staff";
+  pageContext?: string;
+  introMessage?: string;
+};
+
+const applicantIntroMessage =
   "Hi, I am the MyPerakuan AI Assistant. I can help you choose a form, understand application status, explain missing document requests, and guide you around the portal.";
 
-export default function AiHelpChat() {
+const staffIntroMessage =
+  "Hi, I am the MyPerakuan Staff AI Assistant. I can help summarize the current review page, explain status actions, draft concise remarks, and guide staff workflows.";
+
+export default function AiHelpChat({
+  audience = "applicant",
+  pageContext = "",
+  introMessage,
+}: AiHelpChatProps) {
+  const resolvedIntroMessage =
+    introMessage ||
+    (audience === "staff" ? staffIntroMessage : applicantIntroMessage);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "intro",
       role: "assistant",
-      text: introMessage,
+      text: resolvedIntroMessage,
     },
   ]);
   const [isSending, setIsSending] = useState(false);
@@ -155,6 +171,8 @@ export default function AiHelpChat() {
           task: "chatbot",
           message,
           conversation,
+          audience,
+          pageContext,
         }),
       });
       const data = (await response.json().catch(() => null)) as {
@@ -166,12 +184,14 @@ export default function AiHelpChat() {
         throw new Error(data?.error || "AI assistant could not respond.");
       }
 
+      const responseText = data.text;
+
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: data.text,
+          text: responseText,
         },
       ]);
     } catch (error) {

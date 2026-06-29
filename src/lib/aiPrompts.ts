@@ -11,6 +11,8 @@ type BuildAiPromptInput = {
   conversation?: { role: "assistant" | "user"; text: string }[];
   currentRemarks?: string;
   targetStatus?: string;
+  audience?: string;
+  pageContext?: string;
 };
 
 const systemInstruction = `
@@ -86,8 +88,11 @@ export function buildAiPrompt({
   conversation,
   currentRemarks,
   targetStatus,
+  audience,
+  pageContext,
 }: BuildAiPromptInput) {
   if (task === "chatbot") {
+    const chatAudience = audience === "staff" ? "staff" : "applicant";
     const conversationContext =
       conversation && conversation.length > 0
         ? conversation
@@ -98,10 +103,20 @@ export function buildAiPrompt({
     return `${systemInstruction}
 ${portalKnowledge}
 
-Task: Applicant help chatbot.
-Answer the applicant's question about using MyPerakuan, application status,
+Task: ${chatAudience === "staff" ? "Staff help chatbot." : "Applicant help chatbot."}
+Current audience: ${chatAudience}.
+Current page context:
+${pageContext || "No page context provided."}
+
+Answer the ${chatAudience}'s question about using MyPerakuan, application status,
 forms, missing documents, notifications, or general portal flow.
-If the question needs official judgment, tell them to contact staff.
+If the audience is staff, focus on staff review workflow, approval review,
+notifications, remarks, status actions, and what is visible in the current page
+context. If selected application details are included in the page context, use
+those details to answer direct factual questions about the selected application.
+If a requested selected-application field is not included in the context, say
+that field is not available in the current AI context. If the audience is
+applicant and the question needs official judgment, tell them to contact staff.
 Use the recent conversation to understand follow-up words like "it", "that",
 "why", or "this system". If the user challenges a previous answer, explain the
 reason based on the known portal facts instead of changing topic.

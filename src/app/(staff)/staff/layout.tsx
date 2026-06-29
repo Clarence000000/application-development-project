@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase"; // adjust path depending on where your firebase configuration lives
 import AiHelpChat from "@/components/AiHelpChat";
+import { subscribeStaffAiPageContext } from "@/lib/aiPageContext";
 import {
   getStaffNotificationKey,
   loadStaffNotificationReadKeys,
@@ -43,6 +44,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<StaffApplicationNotification[]>([]);
   const [staffUid, setStaffUid] = useState("");
+  const [staffAiContentContext, setStaffAiContentContext] = useState("");
   const [readNotificationKeys, setReadNotificationKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -63,6 +65,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [notifOpen, profileOpen]);
+
+  useEffect(() => subscribeStaffAiPageContext(setStaffAiContentContext), []);
 
   useEffect(() => {
     let unsubscribeApplications: (() => void) | null = null;
@@ -439,9 +443,41 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
 
-      <AiHelpChat />
+      <AiHelpChat
+        audience="staff"
+        pageContext={getStaffAiPageContext(pathname, staffAiContentContext)}
+      />
     </div>
   );
+}
+
+function getStaffAiPageContext(pathname: string, contentContext: string) {
+  const selectedContentContext =
+    pathname.includes("/staff/approval-review") && contentContext
+    ? ` Current selected page content: ${contentContext}`
+    : "";
+
+  if (pathname.includes("/staff/notifications")) {
+    return [
+      "Staff Notifications page.",
+      "Shows newly submitted pending applications and pending applications that are 3 or more days late.",
+      "Clicking a notification opens the exact application in Approval Review and marks the notification as read.",
+      "The top-right notification icon shows unread staff notifications.",
+      selectedContentContext,
+    ].join(" ");
+  }
+
+  if (pathname.includes("/staff/approval-review")) {
+    return [
+      "Staff Approval Review page.",
+      "Staff can review submitted applications, search and filter applications, open the approval drawer, generate AI summaries, suggest missing information, and choose status actions.",
+      "Status actions include Staff Vetted, Request Missing Document, Approve, and Reject.",
+      "When staff selects a status action, the portal can generate a draft remark for that exact selected status before confirmation.",
+      selectedContentContext,
+    ].join(" ");
+  }
+
+  return `Staff portal page. Help should focus on staff review workflows, notifications, remarks, and application decisions.${selectedContentContext}`;
 }
 
 function readUserRole(value: unknown): UserRole {

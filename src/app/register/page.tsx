@@ -155,12 +155,6 @@ export default function RegisterPage() {
          {/* Branding/Hero Section */}
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
             <div className="max-w-xl">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-semibold text-[#475569] shadow-sm">
-                <span className="material-symbols-outlined text-[16px] text-primary">
-                  verified
-                </span>
-                Secure certificate portal
-              </div>
               <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
                 Certificate Validation System
               </h1>

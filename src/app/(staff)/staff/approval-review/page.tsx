@@ -15,6 +15,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { publishStaffAiPageContext } from "@/lib/aiPageContext";
 import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
 import {
   createInAppNotification,
@@ -241,6 +242,16 @@ export default function ApprovalReviewPage() {
   const selectedApplication = applications.find(
     (application) => application.documentId === selectedId,
   );
+
+  useEffect(() => {
+    publishStaffAiPageContext(
+      selectedApplication
+        ? buildSelectedApplicationAiContext(selectedApplication)
+        : "",
+    );
+
+    return () => publishStaffAiPageContext("");
+  }, [selectedApplication]);
 
   useEffect(() => {
     if (!focusedReference || applications.length === 0) return;
@@ -838,7 +849,7 @@ export default function ApprovalReviewPage() {
       </section>
 
       {selectedApplication && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/45">
           <button
             className="absolute inset-0 cursor-default"
             aria-label="Close application detail"
@@ -1055,7 +1066,7 @@ export default function ApprovalReviewPage() {
       )}
 
       {selectedApplication && pendingDecisionStatus && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
           <section className="w-full max-w-lg rounded-lg border border-outline-variant bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-outline-variant px-4 py-3">
               <div>
@@ -1404,6 +1415,21 @@ function mapApplicationRecord(
       },
     ],
   };
+}
+
+function buildSelectedApplicationAiContext(application: ApplicationRecord) {
+  return [
+    `Selected application reference: ${application.id}.`,
+    `Form: ${application.formName}.`,
+    `Applicant: ${application.applicantName}.`,
+    `Status: ${application.status}.`,
+    `District: ${application.district}.`,
+    `Submitted date: ${application.submittedDate}.`,
+    `Pending days: ${application.pendingDays}.`,
+    `Address: ${application.address}.`,
+    `Purpose: ${application.purpose}.`,
+    `Office/review notes: ${application.supportingNotes || "No office remarks recorded yet."}`,
+  ].join(" ");
 }
 
 function mapApprovalStatus(

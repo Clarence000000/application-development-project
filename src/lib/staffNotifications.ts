@@ -29,7 +29,6 @@ const OVERDUE_PENDING_DAYS = 3;
 const READ_STORAGE_PREFIX = "staffNotificationReads";
 const READ_SYNC_EVENT = "staff-notification-reads-updated";
 const FRESH_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
-const STAFF_NOTIFICATION_REFRESH_MS = 5_000;
 const STAFF_NOTIFICATION_STARTUP_REFRESH_MS = 1_000;
 
 type StaffNotificationSubscriptionOptions = {
@@ -91,10 +90,6 @@ export function subscribeStaffApplicationNotifications({
       refreshSnapshot();
     },
   );
-  const refreshTimer = window.setInterval(
-    refreshSnapshot,
-    STAFF_NOTIFICATION_REFRESH_MS,
-  );
   const startupRefreshTimer = window.setTimeout(
     refreshSnapshot,
     STAFF_NOTIFICATION_STARTUP_REFRESH_MS,
@@ -110,7 +105,6 @@ export function subscribeStaffApplicationNotifications({
   return () => {
     isActive = false;
     unsubscribeSnapshot();
-    window.clearInterval(refreshTimer);
     window.clearTimeout(startupRefreshTimer);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
   };

@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
     conversation: readConversation(body.conversation),
     currentRemarks: readString(body.currentRemarks),
     targetStatus: readString(body.targetStatus),
+    audience: readString(body.audience),
+    pageContext: readString(body.pageContext),
   });
 
   try {
