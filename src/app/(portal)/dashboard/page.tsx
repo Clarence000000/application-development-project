@@ -23,6 +23,8 @@ interface Application {
   status: string;
 }
 
+type RawApplication = { id: string } & Record<string, unknown>;
+
 export default function DashboardPage() {
   const router = useRouter();
   const [userName, setUserName] = useState("");
@@ -61,9 +63,9 @@ export default function DashboardPage() {
           unsubscribeApplications = onSnapshot(
             q,
             (querySnap) => {
-              const rawAppsList = querySnap.docs.map((documentSnapshot) => ({
+              const rawAppsList: RawApplication[] = querySnap.docs.map((documentSnapshot) => ({
                 id: documentSnapshot.id,
-                ...documentSnapshot.data(),
+                ...(documentSnapshot.data() as Record<string, unknown>),
               }));
 
               // 1. Sort by the raw Firestore timestamp FIRST (descending)
