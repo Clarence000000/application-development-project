@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
 import {
@@ -84,6 +84,20 @@ const statusStyles: Record<
 };
 
 export default function ApprovalReviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-sm font-medium text-secondary">
+          Loading approval review...
+        </div>
+      }
+    >
+      <ApprovalReviewContent />
+    </Suspense>
+  );
+}
+
+function ApprovalReviewContent() {
   const searchParams = useSearchParams();
   const focusedReference = searchParams.get("focus");
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
