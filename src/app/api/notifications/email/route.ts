@@ -115,6 +115,10 @@ async function getPreferences(uid: string) {
 
   const data = preferencesSnap.data();
 
+  if (!data) {
+    return defaultPreferences;
+  }
+
   return {
     emailEnabled:
       typeof data.emailEnabled === "boolean"

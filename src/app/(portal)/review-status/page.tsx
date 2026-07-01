@@ -4,17 +4,22 @@ import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  updateDoc,
   where,
   type Timestamp,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { deleteDraftApplicationDocument } from "@/lib/applications";
+import { createInAppNotification } from "@/lib/notifications";
 
 interface Application {
   documentId: string;
@@ -78,6 +83,10 @@ function ReviewStatusContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeFocusId, setActiveFocusId] = useState<string | null>(null);
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
+  const [resubmitFile, setResubmitFile] = useState<File | null>(null);
+  const [resubmitLoading, setResubmitLoading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!focusedId || isLoading || applications.length === 0) return;
@@ -166,6 +175,76 @@ function ReviewStatusContent() {
     setTimeout(() => {
       setShowToast(false);
     }, 3000);
+  };
+
+  const handleResubmit = async (app: Application) => {
+    if (!resubmitFile) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setResubmitLoading(true);
+    try {
+      // 1. Upload file to Firebase Storage
+      const storagePath = `applications/${user.uid}/${app.documentId}/resubmitted_${Date.now()}_${resubmitFile.name}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, resubmitFile);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // 2. Update Firestore: append URL to values, reset status
+      const docRef = doc(db, "applications", app.documentId);
+      await updateDoc(docRef, {
+        "values.resubmittedDocumentUrl": downloadURL,
+        status: "In Review",
+        resubmittedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 3. Create notification for the applicant
+      await createInAppNotification({
+        uid: user.uid,
+        title: "Document Resubmitted",
+        message: `Your additional document for ${app.title} (${app.id}) has been submitted. Your application is now back under review.`,
+        applicationId: app.documentId,
+        referenceNumber: app.id,
+        applicationTitle: app.title,
+        eventType: "status_updated",
+      });
+
+      setResubmitFile(null);
+      setSelectedApp(null);
+      triggerToast("Document submitted successfully! Your application is back under review.");
+    } catch (error) {
+      console.error("Failed to resubmit document", error);
+      triggerToast("Failed to upload document. Please try again.");
+    } finally {
+      setResubmitLoading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) setResubmitFile(file);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setResubmitFile(file);
   };
 
   const handleDeleteDraft = async (app: Application) => {
@@ -658,6 +737,70 @@ function ReviewStatusContent() {
                   ))}
                 </div>
               </div>
+
+              {/* Upload Missing Document Section */}
+              {selectedApp.status === "Action Required" && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
+                    Upload Required Document
+                  </h4>
+                  <div
+                    className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all cursor-pointer ${
+                      dragActive
+                        ? "border-primary bg-primary/5"
+                        : "border-outline-variant hover:border-primary/50 hover:bg-surface-container-low"
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                    <span className="material-symbols-outlined text-3xl text-outline mb-2 block">
+                      cloud_upload
+                    </span>
+                    <p className="text-xs font-semibold text-on-surface">
+                      Drag & drop your file here
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant mt-1">
+                      or click to browse · PDF, JPG, PNG accepted
+                    </p>
+                  </div>
+
+                  {resubmitFile && (
+                    <div className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
+                          description
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-on-surface truncate">
+                            {resubmitFile.name}
+                          </p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {(resubmitFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResubmitFile(null);
+                        }}
+                        className="material-symbols-outlined text-on-surface-variant hover:text-error text-[18px] p-1 rounded-full hover:bg-error-container/30 transition cursor-pointer shrink-0"
+                      >
+                        close
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Drawer Footer Actions */}
@@ -676,22 +819,30 @@ function ReviewStatusContent() {
               )}
               {selectedApp.status === "Action Required" && (
                 <button
-                  onClick={() => {
-                    setSelectedApp(null);
-                    triggerToast(
-                      "Action resolved. Upload submitted successfully!",
-                    );
-                  }}
-                  className="flex-1 bg-primary text-white font-bold text-xs py-2.5 rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  disabled={!resubmitFile || resubmitLoading}
+                  onClick={() => handleResubmit(selectedApp)}
+                  className="flex-1 bg-primary text-white font-bold text-xs py-2.5 rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined text-sm">
-                    cloud_upload
-                  </span>
-                  Upload Missing Copy
+                  {resubmitLoading ? (
+                    <>
+                      <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">
+                        cloud_upload
+                      </span>
+                      Submit Document
+                    </>
+                  )}
                 </button>
               )}
               <button
-                onClick={() => setSelectedApp(null)}
+                onClick={() => {
+                  setSelectedApp(null);
+                  setResubmitFile(null);
+                }}
                 className="flex-grow border border-outline text-secondary text-xs font-bold py-2.5 rounded-lg hover:bg-surface-container transition-all cursor-pointer text-center"
               >
                 Close Drawer
@@ -753,7 +904,9 @@ function mapFirestoreApplication(
     warning:
       status === "Rejected"
         ? readString(data.rejectionReason) || "Application rejected"
-        : undefined,
+        : status === "Action Required"
+          ? readString(data.officeComment) || "Additional documents required"
+          : undefined,
     timeline: buildTimeline(status, displayDate, approvedAt, rejectedAt),
     sortTime:
       (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,
