@@ -48,6 +48,7 @@ type ApplicationRecord = {
   timeline: { title: string; date: string; done: boolean }[];
   isUrgent: boolean; // For reprioritization
   pendingDays: number;
+  resubmittedDocumentUrl?: string;
 };
 
 type AiReviewTask = "staff_summary" | "missing_documents";
@@ -954,6 +955,30 @@ function ApprovalReviewContent() {
                   </div>
                 </section>
 
+                {selectedApplication.resubmittedDocumentUrl && (
+                  <section>
+                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+                      Resubmitted Document
+                    </h3>
+                    <div className="rounded-lg border-2 border-green-300 bg-green-50 p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-green-700 text-[18px]">attach_file</span>
+                        <a
+                          href={selectedApplication.resubmittedDocumentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-green-800 hover:underline"
+                        >
+                          View Resubmitted Document
+                        </a>
+                      </div>
+                      <span className="rounded-full bg-green-700 px-2 py-0.5 text-[10px] font-bold text-white">
+                        NEW
+                      </span>
+                    </div>
+                  </section>
+                )}
+
                 <section>
                   <div>
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
@@ -1390,6 +1415,8 @@ function mapApplicationRecord(
     sortTime: submittedAt?.getTime() || 0,
     isUrgent,
     pendingDays,
+    resubmittedDocumentUrl:
+      readString(values.resubmittedDocumentUrl) || undefined,
     timeline: [
       {
         title: "Application Submitted",
