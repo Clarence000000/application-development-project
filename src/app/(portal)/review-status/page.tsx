@@ -17,7 +17,7 @@ import {
   where,
   type Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { deleteDraftApplicationDocument } from "@/lib/applications";
 import { createInAppNotification } from "@/lib/notifications";
 
@@ -85,6 +85,7 @@ function ReviewStatusContent() {
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
   const [resubmitFile, setResubmitFile] = useState<File | null>(null);
   const [resubmitLoading, setResubmitLoading] = useState(false);
+  const [resubmitProgress, setResubmitProgress] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,14 +185,40 @@ function ReviewStatusContent() {
     if (!user) return;
 
     setResubmitLoading(true);
+    setResubmitProgress(0);
     try {
-      // 1. Upload file to Firebase Storage
       const storagePath = `applications/${user.uid}/${app.documentId}/resubmitted_${Date.now()}_${resubmitFile.name}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, resubmitFile);
-      const downloadURL = await getDownloadURL(storageRef);
+      const uploadTask = uploadBytesResumable(storageRef, resubmitFile);
 
-      // 2. Update Firestore: append URL to values, reset status
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          uploadTask.cancel();
+          reject(new Error("The upload timed out after 45 seconds."));
+        }, 45_000);
+
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100,
+            );
+            setResubmitProgress(progress);
+          },
+          (error) => {
+            window.clearTimeout(timeoutId);
+            reject(error);
+          },
+          () => {
+            window.clearTimeout(timeoutId);
+            setResubmitProgress(100);
+            resolve();
+          },
+        );
+      });
+
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
       const docRef = doc(db, "applications", app.documentId);
       await updateDoc(docRef, {
         "values.resubmittedDocumentUrl": downloadURL,
@@ -200,7 +227,6 @@ function ReviewStatusContent() {
         updatedAt: serverTimestamp(),
       });
 
-      // 3. Create notification for the applicant
       await createInAppNotification({
         uid: user.uid,
         title: "Document Resubmitted",
@@ -216,9 +242,10 @@ function ReviewStatusContent() {
       triggerToast("Document submitted successfully! Your application is back under review.");
     } catch (error) {
       console.error("Failed to resubmit document", error);
-      triggerToast("Failed to upload document. Please try again.");
+      triggerToast(getResubmissionErrorMessage(error));
     } finally {
       setResubmitLoading(false);
+      setResubmitProgress(null);
     }
   };
 
@@ -591,7 +618,7 @@ function ReviewStatusContent() {
 
       {/* Details Side-Drawer / Modal (Premium Overlay) */}
       {selectedApp && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/55 animate-fade-in">
           {/* Backdrop Click Dismisses */}
           <div
             className="absolute inset-0"
@@ -599,7 +626,7 @@ function ReviewStatusContent() {
           ></div>
 
           {/* Drawer Body */}
-          <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col z-10 animate-slide-in-right">
+          <div className="relative z-10 flex h-full w-full max-w-md flex-col bg-white shadow-xl will-change-transform animate-slide-in-right">
             {/* Drawer Header */}
             <div className="p-5 border-b border-outline-variant flex items-center justify-between">
               <div>
@@ -818,7 +845,7 @@ function ReviewStatusContent() {
                   {resubmitLoading ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Uploading...
+                      Uploading{resubmitProgress !== null ? ` ${resubmitProgress}%` : ""}...
                     </>
                   ) : (
                     <>
@@ -855,6 +882,27 @@ function ReviewStatusContent() {
       )}
     </div>
   );
+}
+
+function getResubmissionErrorMessage(error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+
+  if (code === "storage/unauthorized") {
+    return "Upload was denied. Please contact the office if the problem continues.";
+  }
+
+  if (code === "storage/canceled") {
+    return "Upload timed out. Check your connection and try again.";
+  }
+
+  if (code === "storage/retry-limit-exceeded") {
+    return "Upload could not connect to storage. Check your connection and try again.";
+  }
+
+  return "Upload failed. Please try again.";
 }
 
 function mapFirestoreApplication(
