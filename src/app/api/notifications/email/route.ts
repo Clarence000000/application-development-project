@@ -6,7 +6,7 @@ import type {
   EmailNotificationPayload,
   NotificationEventType,
   NotificationPreferences,
-} from "@/lib/notifications";
+} from "@/lib/notificationTypes";
 
 export const runtime = "nodejs";
 
@@ -113,7 +113,7 @@ async function getPreferences(uid: string) {
     return defaultPreferences;
   }
 
-  const data = preferencesSnap.data();
+  const data = preferencesSnap.data() ?? {};
 
   if (!data) {
     return defaultPreferences;
@@ -229,11 +229,11 @@ async function updateEmailDeliveryStatus(
     return;
   }
 
-  await adminDb.collection("notifications").doc(payload.notificationId).update({
+  await adminDb.collection("notifications").doc(payload.notificationId).set({
     emailStatus: deliveryStatus,
     emailRecipient: payload.recipientEmail,
     updatedAt: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 }
 
 function normalizePayload(data: Record<string, unknown>): EmailNotificationPayload {
@@ -379,7 +379,7 @@ function emailTemplate({
     <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
       <p>${escapeHtml(greeting)}</p>
       <h2 style="color: #002d62; margin-bottom: 8px;">${escapeHtml(title)}</h2>
-      <p>${escapeHtml(summary)}</p>
+      ${renderStructuredMessage(summary)}
       <table style="border-collapse: collapse; margin: 16px 0; width: 100%; max-width: 520px;">
         <tr>
           <td style="border: 1px solid #e5e7eb; padding: 10px; font-weight: 700;">Application</td>
@@ -437,4 +437,110 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function renderStructuredMessage(value: string) {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  const htmlParts: string[] = [];
+  let listItems: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+
+  function flushList() {
+    if (!listType || listItems.length === 0) {
+      return;
+    }
+
+    htmlParts.push(
+      `<${listType} style="margin: 8px 0 16px 22px; padding: 0;">${listItems.join("")}</${listType}>`,
+    );
+    listItems = [];
+    listType = null;
+  }
+
+  for (const line of lines) {
+    if (/^-{3,}$/.test(line) || isMarkdownTableSeparator(line)) {
+      flushList();
+      htmlParts.push(`<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;" />`);
+      continue;
+    }
+
+    if (isMarkdownTableRow(line)) {
+      flushList();
+      htmlParts.push(
+        `<p style="margin: 0 0 8px;">${parseMarkdownTableRow(line)
+          .map((cell) => escapeHtml(stripMarkdown(cell)))
+          .join(" · ")}</p>`,
+      );
+      continue;
+    }
+
+    const headingMatch = line.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) {
+      flushList();
+      htmlParts.push(
+        `<h3 style="color: #002d62; font-size: 16px; margin: 18px 0 8px;">${escapeHtml(stripMarkdown(headingMatch[1]))}</h3>`,
+      );
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      if (listType !== "ul") {
+        flushList();
+        listType = "ul";
+      }
+      listItems.push(`<li style="margin: 0 0 6px;">${escapeHtml(stripMarkdown(bulletMatch[1]))}</li>`);
+      continue;
+    }
+
+    const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (numberedMatch) {
+      if (listType !== "ol") {
+        flushList();
+        listType = "ol";
+      }
+      listItems.push(`<li style="margin: 0 0 6px;">${escapeHtml(stripMarkdown(numberedMatch[1]))}</li>`);
+      continue;
+    }
+
+    flushList();
+    htmlParts.push(`<p style="margin: 0 0 12px;">${escapeHtml(stripMarkdown(line))}</p>`);
+  }
+
+  flushList();
+
+  return htmlParts.join("");
+}
+
+function stripMarkdown(value: string) {
+  return value
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
+function isMarkdownTableRow(line: string) {
+  return line.includes("|") && parseMarkdownTableRow(line).length > 1;
+}
+
+function isMarkdownTableSeparator(line: string) {
+  return /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(line);
+}
+
+function parseMarkdownTableRow(line: string) {
+  return line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter(Boolean);
 }

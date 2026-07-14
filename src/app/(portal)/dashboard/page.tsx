@@ -11,7 +11,7 @@ import {
   collection,
   query,
   where,
-  getDocs,
+  onSnapshot,
   type Timestamp,
 } from "firebase/firestore";
 
@@ -23,6 +23,8 @@ interface Application {
   status: string;
 }
 
+type RawApplication = { id: string } & Record<string, unknown>;
+
 export default function DashboardPage() {
   const router = useRouter();
   const [userName, setUserName] = useState("");
@@ -30,9 +32,15 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let unsubscribeApplications: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      unsubscribeApplications?.();
+      unsubscribeApplications = null;
+
       if (user) {
         try {
+          setIsLoading(true);
                     // 1. Fetch user's profile details
           const userRef = doc(db, "users", user.uid);
           const userSnap = await getDoc(userRef);
@@ -51,44 +59,57 @@ export default function DashboardPage() {
             collection(db, "applications"),
             where("userId", "==", user.uid),
           );
-          const querySnap = await getDocs(q);
-          const rawAppsList: any[] = [];
 
-          querySnap.forEach((documentSnapshot) => {
-            rawAppsList.push({
-              id: documentSnapshot.id,
-              ...documentSnapshot.data(),
-            });
-          });
+          unsubscribeApplications = onSnapshot(
+            q,
+            (querySnap) => {
+              const rawAppsList: RawApplication[] = querySnap.docs.map((documentSnapshot) => ({
+                id: documentSnapshot.id,
+                ...(documentSnapshot.data() as Record<string, unknown>),
+              }));
 
-          // 1. Sort by the raw Firestore timestamp FIRST (descending)
-          rawAppsList.sort((a, b) => {
-            const timeA = toDate(a.submittedAt)?.getTime() || 0;
-            const timeB = toDate(b.submittedAt)?.getTime() || 0;
-            return timeB - timeA;
-          });
+              // 1. Sort by the raw Firestore timestamp FIRST (descending)
+              rawAppsList.sort((a, b) => {
+                const timeA = toDate(a.submittedAt)?.getTime() || 0;
+                const timeB = toDate(b.submittedAt)?.getTime() || 0;
+                return timeB - timeA;
+              });
 
-          // 2. Format and map to the specific properties need for the UI
-          const appsList: Application[] = rawAppsList.map((data) => ({
-            id: data.referenceNumber || data.applicationId || data.id, // ID already handled above
-            type: data.formSlug || data.type,
-            title: data.formType || data.title || "Permohonan Penghulu",
-            submittedAt: formatFirestoreDate(data.submittedAt), // Format happens safely AFTER sort
-            status: data.status || "In Review",
-          }));
+              // 2. Format and map to the specific properties need for the UI
+              const appsList: Application[] = rawAppsList.map((data) => ({
+                id: readString(data.referenceNumber, data.applicationId, data.id),
+                type: readString(data.formSlug, data.type),
+                title:
+                  readString(data.formType, data.title) ||
+                  "Permohonan Penghulu",
+                submittedAt: formatFirestoreDate(data.submittedAt),
+                status: readString(data.status) || "In Review",
+              }));
 
-          setApplications(appsList.slice(0, 3));
+              setApplications(appsList.slice(0, 3));
+              setIsLoading(false);
+            },
+            (err) => {
+              console.error("Error listening to dashboard applications: ", err);
+              setIsLoading(false);
+            },
+          );
         } catch (err) {
           console.error("Error loading dashboard data: ", err);
-        } finally {
           setIsLoading(false);
         }
       } else {
+        setApplications([]);
+        setUserName("");
+        setIsLoading(false);
         router.push("/login");
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeApplications?.();
+      unsubscribe();
+    };
   }, [router]);
 
   const handleCardClick = (href: string) => {
@@ -305,8 +326,8 @@ export default function DashboardPage() {
               })
             ) : (
               <div className="bg-white border border-outline-variant border-dashed rounded-lg p-6 text-center text-xs text-on-surface-variant">
-                No active applications were found. Please click "Apply for a
-                Certificate" to create a new application.
+                No active applications were found. Please click &quot;Apply for a
+                Certificate&quot; to create a new application.
               </div>
             )}
           </div>
@@ -338,6 +359,14 @@ function formatFirestoreDate(value: unknown) {
     month: "short",
     year: "numeric",
   }).format(date);
+}
+
+function readString(...values: unknown[]) {
+  const found = values.find(
+    (value) => typeof value === "string" && value.trim(),
+  );
+
+  return typeof found === "string" ? found.trim() : "";
 }
 
 function toDate(value: unknown) {

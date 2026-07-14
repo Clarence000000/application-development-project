@@ -131,11 +131,11 @@ async function updateSmsDeliveryStatus(
     return;
   }
 
-  await adminDb.collection("notifications").doc(notificationId).update({
+  await adminDb.collection("notifications").doc(notificationId).set({
     smsStatus: deliveryStatus,
     smsRecipient: typeof recipient === "string" ? formatToE164(recipient) : null,
     updatedAt: FieldValue.serverTimestamp(),
-  });
+  }, { merge: true });
 }
 
 async function getSmsPreferences(uid: string) {

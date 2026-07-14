@@ -76,6 +76,15 @@ function ResetPasswordContent() {
 
   return (
     <main className="min-h-screen bg-white px-6 py-10 text-on-background">
+      {/* TopAppBar */}
+      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-[#0F172A] border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <span className="text-lg font-bold text-white tracking-tight">
+            MyPerakuan
+          </span>
+        </div>
+      </header>
+      
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl items-center">
         <div className="grid w-full grid-cols-1 items-center gap-10 lg:grid-cols-12">
           <section className="hidden lg:col-span-7 lg:block">

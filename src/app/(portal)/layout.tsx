@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import AiHelpChat from "@/components/AiHelpChat";
 import {
   formatNotificationDate,
   subscribeNotificationHistory,
@@ -71,7 +72,7 @@ export default function PortalLayout({
       unsubscribeNotifications?.();
       unsubscribeNotifications = subscribeNotificationHistory(
         user.uid,
-        (history) => setNotifications(history.slice(0, 4)),
+        (history) => setNotifications(history.slice(0, 99)),
         (error) => console.error("Notification dropdown listener failed", error),
       );
     });
@@ -92,7 +93,7 @@ export default function PortalLayout({
     router.push("/login");
   };
 
-  const handleSettings = (e: React.MouseEvent) => {
+  const handleSettings = () => {
     router.push("/settings");
   };
 
@@ -473,6 +474,35 @@ export default function PortalLayout({
           );
         })}
       </nav>
+
+      <AiHelpChat
+        audience="applicant"
+        pageContext={getApplicantAiPageContext(pathname)}
+      />
     </div>
   );
+}
+
+function getApplicantAiPageContext(pathname: string) {
+  if (pathname.includes("/new-application")) {
+    return "Applicant New Application page. Users choose an application form and can view required documents on each application card.";
+  }
+
+  if (pathname.includes("/review-status")) {
+    return "Applicant Review Status page. Users can view submitted application status, office remarks, action required notes, approvals, and rejections.";
+  }
+
+  if (pathname.includes("/notifications")) {
+    return "Applicant Notifications page. Users can view in-app notification history and notification delivery preferences.";
+  }
+
+  if (pathname.includes("/settings")) {
+    return "Applicant Settings page. Settings includes Profile, Security, Language, Theme, Notifications, and Support.";
+  }
+
+  if (pathname.includes("/dashboard")) {
+    return "Applicant Dashboard page. Users can see recent applications and continue common portal actions.";
+  }
+
+  return "Applicant portal page. Help should focus on form choice, application status, notifications, settings, and portal navigation.";
 }

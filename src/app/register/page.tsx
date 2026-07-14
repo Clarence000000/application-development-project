@@ -140,10 +140,10 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-on-background font-sans overflow-x-hidden">
       {/* TopAppBar */}
-      <header className="fixed top-0 left-0 w-full h-14 flex items-center justify-between px-6 z-50 bg-white border-b border-[#E2E8F0]">
-        <div className="flex items-center gap-3">
-          <span className="text-base font-bold text-[#002D62] tracking-tight">
-            Certificate Validation System
+      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-8 z-50 bg-[#0F172A] border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <span className="text-lg font-bold text-white tracking-tight">
+            MyPerakuan
           </span>
         </div>
       </header>
@@ -152,11 +152,53 @@ export default function RegisterPage() {
       <main className="flex-grow flex items-center justify-center pt-20 pb-8 px-6">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
-          {/* Left Section */}
-          <div className="hidden lg:flex lg:col-span-7 flex-col space-y-6">
-             <h1 className="text-3xl font-bold leading-tight tracking-tight text-primary">
+         {/* Branding/Hero Section */}
+          <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
+            <div className="max-w-xl">
+              <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
                 Certificate Validation System
-             </h1>
+              </h1>
+              <p className="mt-4 max-w-lg text-base leading-7 text-[#475569]">
+                Verify applications, review official records, and manage certificate requests from one secure workspace.
+              </p>
+            </div>
+
+            <div className="grid max-w-xl grid-cols-3 gap-3">
+              {[
+                { icon: "lock", label: "Secure Access" },
+                { icon: "fact_check", label: "Review Status" },
+                { icon: "workspace_premium", label: "Official Records" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[20px] text-primary">
+                    {item.icon}
+                  </span>
+                  <p className="mt-2 text-xs font-bold text-[#0F172A]">
+                    {item.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="relative h-40 max-w-xl overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+              <div className="absolute left-6 top-6 h-24 w-20 rounded-md border border-[#CBD5E1] bg-[#F8FAFC]" />
+              <div className="absolute left-10 top-10 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white">
+                <span className="material-symbols-outlined text-[26px]">
+                  approval
+                </span>
+              </div>
+              <div className="absolute left-36 top-8 h-3 w-56 rounded-full bg-[#CBD5E1]" />
+              <div className="absolute left-36 top-14 h-2 w-72 rounded-full bg-[#E2E8F0]" />
+              <div className="absolute left-36 top-28 grid grid-cols-3 gap-3">
+                <span className="h-7 w-24 rounded-md bg-[#EFF6FF]" />
+                <span className="h-7 w-24 rounded-md bg-[#F1F5F9]" />
+                <span className="h-7 w-24 rounded-md bg-[#F8FAFC]" />
+              </div>
+              <div className="absolute right-0 top-0 h-full w-1 bg-primary" />
+            </div>
           </div>
 
           {/* Right Section (Form) */}

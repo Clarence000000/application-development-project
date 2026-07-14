@@ -4,6 +4,44 @@ export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+const OCR_BRAND_OR_PREFIX_NOISE = new Set([
+  "MYKAD",
+  "MYKID",
+  "MYLA",
+  "MYLI",
+  "MYKA",
+  "CARS",
+]);
+
+function normalizeAlphaText(value: string) {
+  return value.toUpperCase().replace(/[^A-Z]/g, "");
+}
+
+function isOcrBrandOrPrefixNoise(line: string) {
+  const normalized = normalizeAlphaText(line);
+
+  return (
+    OCR_BRAND_OR_PREFIX_NOISE.has(normalized) ||
+    normalized.includes("MYKAD") ||
+    normalized.includes("MALAYSIA") ||
+    normalized.includes("KADPENGENALAN")
+  );
+}
+
+function isLikelyNameLine(line: string) {
+  const words = line
+    .toUpperCase()
+    .split(/\s+/)
+    .map((word) => word.replace(/[^A-Z@'/-]/g, ""))
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return false;
+  }
+
+  return words.some((word) => word.length > 4) || words.length > 1;
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
 
@@ -99,7 +137,7 @@ export async function POST(request: Request) {
       !l.includes("KAD PENGENALAN") && 
       !l.includes("MALAYSIA") && 
       !l.includes("IDENTITY CARD") && 
-      !l.includes("MYKAD") &&
+      !isOcrBrandOrPrefixNoise(l) &&
       !l.match(/\d{6}-\d{2}-\d{4}/) &&
       // Filter out typical broken fragments of the holographic background text
       !l.includes("LAKERAJAAN") && 
@@ -121,7 +159,10 @@ export async function POST(request: Request) {
 
   if (addressStartIndex !== -1) {
     // Everything before the address starts must be the name!
-    const namePool = cleanLines.slice(0, addressStartIndex);
+    const namePool = cleanLines
+      .slice(0, addressStartIndex)
+      .filter((line: string) => !isOcrBrandOrPrefixNoise(line))
+      .filter(isLikelyNameLine);
     extractedName = namePool.join(" ").toUpperCase();
 
     // Grab lines starting from the address identifier down to the footers

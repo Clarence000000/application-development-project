@@ -17,7 +17,7 @@ import {
   where,
   type Timestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { deleteDraftApplicationDocument } from "@/lib/applications";
 import { createInAppNotification } from "@/lib/notifications";
 
@@ -34,10 +34,10 @@ interface Application {
   statusColor: string;
   statusBg: string;
   statusDot: string;
-  warning?: string;
   link?: string;
   downloadUrl?: string;
   serialNumber?: string;
+  officeRemark?: string;
   timeline: { title: string; date: string; desc: string; done: boolean }[];
 }
 
@@ -85,6 +85,7 @@ function ReviewStatusContent() {
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
   const [resubmitFile, setResubmitFile] = useState<File | null>(null);
   const [resubmitLoading, setResubmitLoading] = useState(false);
+  const [resubmitProgress, setResubmitProgress] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,14 +185,40 @@ function ReviewStatusContent() {
     if (!user) return;
 
     setResubmitLoading(true);
+    setResubmitProgress(0);
     try {
-      // 1. Upload file to Firebase Storage
       const storagePath = `applications/${user.uid}/${app.documentId}/resubmitted_${Date.now()}_${resubmitFile.name}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, resubmitFile);
-      const downloadURL = await getDownloadURL(storageRef);
+      const uploadTask = uploadBytesResumable(storageRef, resubmitFile);
 
-      // 2. Update Firestore: append URL to values, reset status
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          uploadTask.cancel();
+          reject(new Error("The upload timed out after 45 seconds."));
+        }, 45_000);
+
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100,
+            );
+            setResubmitProgress(progress);
+          },
+          (error) => {
+            window.clearTimeout(timeoutId);
+            reject(error);
+          },
+          () => {
+            window.clearTimeout(timeoutId);
+            setResubmitProgress(100);
+            resolve();
+          },
+        );
+      });
+
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+
       const docRef = doc(db, "applications", app.documentId);
       await updateDoc(docRef, {
         "values.resubmittedDocumentUrl": downloadURL,
@@ -200,7 +227,6 @@ function ReviewStatusContent() {
         updatedAt: serverTimestamp(),
       });
 
-      // 3. Create notification for the applicant
       await createInAppNotification({
         uid: user.uid,
         title: "Document Resubmitted",
@@ -216,9 +242,10 @@ function ReviewStatusContent() {
       triggerToast("Document submitted successfully! Your application is back under review.");
     } catch (error) {
       console.error("Failed to resubmit document", error);
-      triggerToast("Failed to upload document. Please try again.");
+      triggerToast(getResubmissionErrorMessage(error));
     } finally {
       setResubmitLoading(false);
+      setResubmitProgress(null);
     }
   };
 
@@ -432,14 +459,6 @@ function ReviewStatusContent() {
                       </span>
                       {app.meta}
                     </span>
-                    {app.warning && (
-                      <span className="flex items-center gap-1 text-error font-semibold">
-                        <span className="material-symbols-outlined text-[14px]">
-                          error
-                        </span>
-                        {app.warning}
-                      </span>
-                    )}
                     {app.serialNumber && (
                       <span className="flex items-center gap-1 text-green-700 font-bold">
                         <span className="material-symbols-outlined text-[14px]">
@@ -599,7 +618,7 @@ function ReviewStatusContent() {
 
       {/* Details Side-Drawer / Modal (Premium Overlay) */}
       {selectedApp && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/55 animate-fade-in">
           {/* Backdrop Click Dismisses */}
           <div
             className="absolute inset-0"
@@ -607,7 +626,7 @@ function ReviewStatusContent() {
           ></div>
 
           {/* Drawer Body */}
-          <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col z-10 animate-slide-in-right">
+          <div className="relative z-10 flex h-full w-full max-w-md flex-col bg-white shadow-xl will-change-transform animate-slide-in-right">
             {/* Drawer Header */}
             <div className="p-5 border-b border-outline-variant flex items-center justify-between">
               <div>
@@ -644,17 +663,6 @@ function ReviewStatusContent() {
                   </div>
                 </div>
 
-                {selectedApp.warning && (
-                  <div className="bg-error-container/30 border border-error/15 rounded-lg p-2.5 flex items-start gap-2 text-xs">
-                    <span className="material-symbols-outlined text-error text-sm shrink-0">
-                      warning
-                    </span>
-                    <p className="text-on-error-container font-semibold">
-                      Action Needed: {selectedApp.warning}
-                    </p>
-                  </div>
-                )}
-
                 {selectedApp.serialNumber && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-start gap-2 text-xs">
                     <span className="material-symbols-outlined text-green-700 text-sm shrink-0">
@@ -671,6 +679,17 @@ function ReviewStatusContent() {
                   </div>
                 )}
               </div>
+
+              {selectedApp.officeRemark && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
+                    Office Remark
+                  </h4>
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low p-3 text-sm leading-6 text-on-surface">
+                    <FormattedOfficeRemark text={selectedApp.officeRemark} />
+                  </div>
+                </div>
+              )}
 
               {/* Application Details Summary */}
               <div className="space-y-3">
@@ -826,7 +845,7 @@ function ReviewStatusContent() {
                   {resubmitLoading ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Uploading...
+                      Uploading{resubmitProgress !== null ? ` ${resubmitProgress}%` : ""}...
                     </>
                   ) : (
                     <>
@@ -865,18 +884,42 @@ function ReviewStatusContent() {
   );
 }
 
+function getResubmissionErrorMessage(error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+
+  if (code === "storage/unauthorized") {
+    return "Upload was denied. Please contact the office if the problem continues.";
+  }
+
+  if (code === "storage/canceled") {
+    return "Upload timed out. Check your connection and try again.";
+  }
+
+  if (code === "storage/retry-limit-exceeded") {
+    return "Upload could not connect to storage. Check your connection and try again.";
+  }
+
+  return "Upload failed. Please try again.";
+}
+
 function mapFirestoreApplication(
   id: string,
   data: Record<string, unknown>,
 ): Application & { sortTime: number } {
-  const status = mapStatus(data.status);
+  const submittedDate = toDate(data.submittedAt);
+  const status = mapStatus(data.status, submittedDate);
   const submittedAt = formatFirestoreDate(data.submittedAt);
   const updatedAt = formatFirestoreDate(data.updatedAt);
   const approvedAt = formatFirestoreDate(data.approvedAt);
   const rejectedAt = formatFirestoreDate(data.rejectedAt);
-  const submittedDate = toDate(data.submittedAt);
   const updatedDate = toDate(data.updatedAt);
   const serialNumber = readString(data.serialNumber);
+  const officeRemark = readString(
+    data.officeComment || data.rejectionReason || data.staffComment,
+  );
   const formSlug = readString(data.formSlug) || readString(data.type);
   const title =
     readString(data.formType) || readString(data.title) || "Office Application";
@@ -899,14 +942,9 @@ function mapFirestoreApplication(
     ...statusStyle(status),
     link: status === "Draft" ? getApplicationHref(formSlug) : undefined,
     serialNumber: serialNumber || undefined,
+    officeRemark: officeRemark || undefined,
     downloadUrl:
       status === "Approved" ? `/api/applications/${id}/pdf` : undefined,
-    warning:
-      status === "Rejected"
-        ? readString(data.rejectionReason) || "Application rejected"
-        : status === "Action Required"
-          ? readString(data.officeComment) || "Additional documents required"
-          : undefined,
     timeline: buildTimeline(status, displayDate, approvedAt, rejectedAt),
     sortTime:
       (status === "Draft" ? updatedDate : submittedDate)?.getTime() || 0,
@@ -959,13 +997,16 @@ function buildTimeline(
   ];
 }
 
-function mapStatus(value: unknown): Application["status"] {
+function mapStatus(
+  value: unknown,
+  submittedAt: Date | null = null,
+): Application["status"] {
   const status = readString(value).toLowerCase();
   if (status === "approved") return "Approved";
   if (status === "rejected") return "Rejected";
   if (status === "in review") return "In Review";
   if (status === "action required") return "Action Required";
-  if (status === "draft") return "Draft";
+  if (status === "draft") return submittedAt ? "In Review" : "Draft";
   return "In Review";
 }
 
@@ -1023,6 +1064,31 @@ function statusStyle(status: Application["status"]) {
     statusBg: "bg-secondary-container",
     statusDot: "bg-on-secondary-container",
   };
+}
+
+function FormattedOfficeRemark({ text }: { text: string }) {
+  return (
+    <div className="space-y-2">
+      {text.split("\n").map((line, index) => {
+        const cleanedLine = cleanRemarkLine(line);
+
+        if (!cleanedLine) {
+          return null;
+        }
+
+        return <p key={`${index}-${cleanedLine}`}>{cleanedLine}</p>;
+      })}
+    </div>
+  );
+}
+
+function cleanRemarkLine(line: string) {
+  return line
+    .trim()
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^[-*]\s+/, "")
+    .replace(/^\d+\.\s+/, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1");
 }
 
 function formatFirestoreDate(value: unknown) {
