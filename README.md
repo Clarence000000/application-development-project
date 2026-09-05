@@ -27,7 +27,7 @@ Follow these steps to get the project running on your computer:
    ```
 
 5. **View the Application**
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   Open [MyPerakuan Vercel](https://myperakuan.vercel.app/) in your browser.
 
 ---
 
