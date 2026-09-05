@@ -83,6 +83,7 @@ function ReviewStatusContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeFocusId, setActiveFocusId] = useState<string | null>(null);
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
+  const [draftToDelete, setDraftToDelete] = useState<Application | null>(null);
   const [resubmitFile, setResubmitFile] = useState<File | null>(null);
   const [resubmitLoading, setResubmitLoading] = useState(false);
   const [resubmitProgress, setResubmitProgress] = useState<number | null>(null);
@@ -239,7 +240,9 @@ function ReviewStatusContent() {
 
       setResubmitFile(null);
       setSelectedApp(null);
-      triggerToast("Document submitted successfully! Your application is back under review.");
+      triggerToast(
+        "Document submitted successfully! Your application is back under review.",
+      );
     } catch (error) {
       console.error("Failed to resubmit document", error);
       triggerToast(getResubmissionErrorMessage(error));
@@ -489,7 +492,7 @@ function ReviewStatusContent() {
                     <button
                       type="button"
                       disabled={deletingDraftId === app.documentId}
-                      onClick={() => handleDeleteDraft(app)}
+                      onClick={() => setDraftToDelete(app)}
                       className="border border-error text-error font-semibold text-xs px-4 py-2 rounded-lg hover:bg-error-container active:scale-95 transition-all flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span className="material-symbols-outlined text-[16px]">
@@ -845,7 +848,9 @@ function ReviewStatusContent() {
                   {resubmitLoading ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Uploading{resubmitProgress !== null ? ` ${resubmitProgress}%` : ""}...
+                      Uploading
+                      {resubmitProgress !== null ? ` ${resubmitProgress}%` : ""}
+                      ...
                     </>
                   ) : (
                     <>
@@ -878,6 +883,52 @@ function ReviewStatusContent() {
             check_circle
           </span>
           {toastMessage}
+        </div>
+      )}
+
+      {draftToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4">
+          <div
+            className="absolute inset-0"
+            onClick={() => setDraftToDelete(null)}
+          ></div>
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-on-surface">
+                  Delete this draft?
+                </h3>
+                <p className="text-sm leading-6 text-on-surface-variant">
+                  This will permanently remove {draftToDelete.id}. You will not
+                  be able to recover it.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDraftToDelete(null)}
+                className="flex-1 rounded-lg border border-outline px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingDraftId === draftToDelete.documentId}
+                onClick={async () => {
+                  const targetDraft = draftToDelete;
+                  setDraftToDelete(null);
+                  await handleDeleteDraft(targetDraft);
+                }}
+                className="flex-1 rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingDraftId === draftToDelete.documentId
+                  ? "Deleting..."
+                  : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

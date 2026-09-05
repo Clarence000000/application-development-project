@@ -51,6 +51,7 @@ export default function ApplicationFormPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isManualSaving, setIsManualSaving] = useState(false);
   const [isDeletingDraft, setIsDeletingDraft] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
   const [draftApplicationId, setDraftApplicationId] = useState<
@@ -358,7 +359,9 @@ export default function ApplicationFormPage({
       setErrors({
         form: "Please sign in again before submitting your application.",
       });
-      scrollToFirstError({ form: "Please sign in again before submitting your application." });
+      scrollToFirstError({
+        form: "Please sign in again before submitting your application.",
+      });
       return;
     }
 
@@ -419,7 +422,9 @@ export default function ApplicationFormPage({
       setErrors({
         form: "Application could not be submitted. Please try again.",
       });
-      scrollToFirstError({ form: "Application could not be submitted. Please try again." });
+      scrollToFirstError({
+        form: "Application could not be submitted. Please try again.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -485,13 +490,13 @@ export default function ApplicationFormPage({
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-80">
-            <div className="border border-outline-variant bg-white p-3">
+            <div className="rounded-xl border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
                 Initial Status
               </p>
-              <p className="mt-1 font-bold text-primary">In Review</p>
+              <p className="mt-1 font-bold text-primary">Draft</p>
             </div>
-            <div className="border border-outline-variant bg-white p-3">
+            <div className="rounded-xl border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
                 Estimated Time
               </p>
@@ -503,7 +508,7 @@ export default function ApplicationFormPage({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 border border-outline-variant bg-white md:grid-cols-3">
+      <section className="grid grid-cols-1 overflow-hidden rounded-xl border border-outline-variant bg-white md:grid-cols-3">
         <ProcessStep
           title="Step 1"
           description="Complete the application details."
@@ -537,7 +542,7 @@ export default function ApplicationFormPage({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <form
           onSubmit={handleSubmit}
-          className="border border-outline-variant bg-white"
+          className="overflow-hidden rounded-xl border border-outline-variant bg-white"
         >
           <section className="border-b border-outline-variant p-5 md:p-6">
             <SectionTitle icon="person" title="Applicant Details" />
@@ -671,7 +676,7 @@ export default function ApplicationFormPage({
 
           <section className="p-5 md:p-6">
             <SectionTitle icon="gavel" title="Applicant Declaration" />
-            <label className="mt-4 flex gap-3 border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface">
+            <label className="mt-4 flex gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface">
               <input
                 id="declaration"
                 type="checkbox"
@@ -719,7 +724,7 @@ export default function ApplicationFormPage({
                   setDeclarationAccepted(false);
                   setErrors({});
                 }}
-                className="border border-outline px-5 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container-low"
+                className="flex-1 rounded-lg border border-outline px-5 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container-low"
               >
                 Clear Form
               </button>
@@ -727,7 +732,7 @@ export default function ApplicationFormPage({
                 type="button"
                 disabled={isManualSaving || isSubmitting || isDeletingDraft}
                 onClick={() => saveDraft({ manual: true })}
-                className="border border-primary px-5 py-2.5 text-sm font-bold text-primary hover:bg-primary-container hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-lg border border-primary px-5 py-2.5 text-sm font-bold text-primary hover:bg-primary-container hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isManualSaving ? "Saving..." : "Save Draft"}
               </button>
@@ -735,8 +740,8 @@ export default function ApplicationFormPage({
                 <button
                   type="button"
                   disabled={isManualSaving || isSubmitting || isDeletingDraft}
-                  onClick={handleDeleteDraft}
-                  className="border border-error px-5 py-2.5 text-sm font-bold text-error hover:bg-error-container disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex-1 rounded-lg border border-error px-5 py-2.5 text-sm font-bold text-error hover:bg-error-container disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isDeletingDraft ? "Deleting..." : "Delete Draft"}
                 </button>
@@ -744,7 +749,7 @@ export default function ApplicationFormPage({
               <button
                 type="submit"
                 disabled={isSubmitting || isManualSaving || isDeletingDraft}
-                className="bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-container"
+                className="flex-1 min-w-[11rem] whitespace-nowrap rounded-lg border border-outline bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-container"
               >
                 {isSubmitting ? "Submitting..." : "Submit Application"}
               </button>
@@ -753,7 +758,7 @@ export default function ApplicationFormPage({
         </form>
 
         <aside className="space-y-4">
-          <div className="border-t-4 border-primary bg-white p-5 shadow-sm">
+          <div className="rounded-xl border-t-4 border-primary bg-white p-5 shadow-sm">
             <h2 className="text-base font-bold text-primary">
               Process Information
             </h2>
@@ -780,7 +785,7 @@ export default function ApplicationFormPage({
               </li>
             </ul>
           </div>
-          <div className="border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
+          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
             <div className="flex gap-2">
               <span className="material-symbols-outlined text-primary">
                 info
@@ -796,7 +801,7 @@ export default function ApplicationFormPage({
 
       {showSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
-          <div className="w-full max-w-md bg-white p-6 text-center shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
               <span className="material-symbols-outlined">check</span>
             </div>
@@ -826,6 +831,49 @@ export default function ApplicationFormPage({
                 className="flex-1 bg-primary px-4 py-2.5 text-sm font-bold text-white"
               >
                 Check Status
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && draftApplicationId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4">
+          <div
+            className="absolute inset-0"
+            onClick={() => setShowDeleteConfirm(false)}
+          ></div>
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-on-surface">
+                  Delete draft application?
+                </h2>
+                <p className="text-sm leading-6 text-on-surface-variant">
+                  This will permanently remove your saved draft and all of its
+                  current values. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-lg border border-outline px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingDraft}
+                onClick={async () => {
+                  setShowDeleteConfirm(false);
+                  await handleDeleteDraft();
+                }}
+                className="flex-1 rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeletingDraft ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

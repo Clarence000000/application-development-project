@@ -238,7 +238,6 @@ function getDisplayName(name: string | undefined, email: string) {
   if (trimmedName && trimmedName.toLowerCase() !== "not scanned") {
     return trimmedName;
   }
-
   return email.split("@")[0] || trimmedName;
 }
 

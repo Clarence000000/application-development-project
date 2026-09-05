@@ -7,14 +7,14 @@ import { registerAccount, RegistrationPayload } from "../../lib/user_auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
-  
+
   const [phoneNumber, setPhoneNumber] = useState("");
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -27,6 +27,7 @@ export default function RegisterPage() {
   const [citizenship, setCitizenship] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [isMyKadScanned, setIsMyKadScanned] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -48,6 +49,7 @@ export default function RegisterPage() {
 
       if (response.ok) {
         const data = await response.json();
+        setIsMyKadScanned(true);
         setName(data.name || "");
         setIcNumber(data.icNumber || "");
         setAddressIC(data.addressIC || "");
@@ -55,11 +57,18 @@ export default function RegisterPage() {
         setReligion(data.religion || "");
         setCitizenship(data.citizenship || "");
       } else {
-        console.warn("OCR API returned an error status, using mock fallback parser data.");
+        console.warn(
+          "OCR API returned an error status, using mock fallback parser data.",
+        );
+        setIsMyKadScanned(true);
         triggerFallbackMock();
       }
     } catch (err) {
-      console.warn("OCR API is offline or failed, using mock fallback parser data:", err);
+      console.warn(
+        "OCR API is offline or failed, using mock fallback parser data:",
+        err,
+      );
+      setIsMyKadScanned(true);
       triggerFallbackMock();
     } finally {
       setIsParsing(false);
@@ -83,7 +92,7 @@ export default function RegisterPage() {
       setErrorMsg("Passwords do not match.");
       return;
     }
-    
+
     // Sprint 4 Placeholder: Keep this until Twilio is ready!
     if (otp !== "123456") {
       setErrorMsg("Invalid OTP code. (Hint: use 123456)");
@@ -99,26 +108,29 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      const displayName = isMyKadScanned
+        ? getDisplayName(name, email)
+        : email.split("@")[0];
       const payload: RegistrationPayload = {
-        name: name || "Not Scanned", 
+        name: displayName,
         icNumber: icNumber || "Not Scanned",
         addressIC: addressIC || "Not Scanned",
-        gender: gender || "Pending",
-        religion: religion || "Pending",
-        citizenship: citizenship || "Pending",
-        
-        addressCurrent: "", 
+        gender: gender || "Select Gender",
+        religion: religion || "Select Religion",
+        citizenship: citizenship || "Select Citizenship",
+
+        addressCurrent: "",
         maritalStatus: "",
         occupation: "",
         monthlyIncome: 0,
-        phoneNumber: phoneNumber, 
+        phoneNumber: phoneNumber,
       };
 
       const newUser = await registerAccount(email, password, payload);
-      
+
       console.log("Account created securely in Firestore:", newUser);
       localStorage.setItem("userRole", newUser.role);
-      
+
       router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
@@ -151,15 +163,15 @@ export default function RegisterPage() {
       {/* Main Content */}
       <main className="flex-grow flex items-center justify-center pt-20 pb-8 px-6">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          
-         {/* Branding/Hero Section */}
+          {/* Branding/Hero Section */}
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
             <div className="max-w-xl">
               <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
                 Certificate Validation System
               </h1>
               <p className="mt-4 max-w-lg text-base leading-7 text-[#475569]">
-                Verify applications, review official records, and manage certificate requests from one secure workspace.
+                Verify applications, review official records, and manage
+                certificate requests from one secure workspace.
               </p>
             </div>
 
@@ -205,8 +217,12 @@ export default function RegisterPage() {
           <div className="lg:col-span-5 flex justify-center lg:justify-end">
             <div className="w-full max-w-md bg-surface-container-lowest border border-[#E2E8F0] rounded-xl p-6 shadow-sm">
               <div className="mb-6 text-center lg:text-left">
-                <h2 className="text-xl font-semibold text-primary mb-1">Create Account</h2>
-                <p className="text-xs text-on-surface-variant">Fill in the details below to start.</p>
+                <h2 className="text-xl font-semibold text-primary mb-1">
+                  Create Account
+                </h2>
+                <p className="text-xs text-on-surface-variant">
+                  Fill in the details below to start.
+                </p>
               </div>
 
               {errorMsg && (
@@ -216,11 +232,12 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                
                 {/* Contact Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-on-surface">Email Address</label>
+                    <label className="block text-xs font-semibold text-on-surface">
+                      Email Address
+                    </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                       placeholder="name@example.com"
@@ -232,7 +249,9 @@ export default function RegisterPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-on-surface">Phone Number</label>
+                    <label className="block text-xs font-semibold text-on-surface">
+                      Phone Number
+                    </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                       placeholder="+60123456789"
@@ -247,7 +266,9 @@ export default function RegisterPage() {
 
                 {/* OTP Verification */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-on-surface">OTP Verification</label>
+                  <label className="block text-xs font-semibold text-on-surface">
+                    OTP Verification
+                  </label>
                   <div className="flex gap-2">
                     <input
                       className="flex-grow px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
@@ -271,7 +292,9 @@ export default function RegisterPage() {
                 {/* Password Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-on-surface">Password</label>
+                    <label className="block text-xs font-semibold text-on-surface">
+                      Password
+                    </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                       placeholder="••••••••"
@@ -283,7 +306,9 @@ export default function RegisterPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-on-surface">Confirm</label>
+                    <label className="block text-xs font-semibold text-on-surface">
+                      Confirm
+                    </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                       placeholder="••••••••"
@@ -298,7 +323,9 @@ export default function RegisterPage() {
 
                 {/* MyKad Upload UI (Sprint 2 - Commit 1) */}
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-on-surface">MyKad Verification</label>
+                  <label className="block text-xs font-semibold text-on-surface">
+                    MyKad Verification
+                  </label>
                   <input
                     id="mykad-file-input"
                     type="file"
@@ -310,32 +337,50 @@ export default function RegisterPage() {
                   {isParsing ? (
                     <div className="border-2 border-dashed border-primary bg-primary/5 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-pulse">
                       <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
-                      <p className="text-[11px] font-bold text-primary">Reading MyKad Data...</p>
-                      <p className="text-[9px] text-on-surface-variant mt-0.5">Please wait, extracting details</p>
+                      <p className="text-[11px] font-bold text-primary">
+                        Reading MyKad Data...
+                      </p>
+                      <p className="text-[9px] text-on-surface-variant mt-0.5">
+                        Please wait, extracting details
+                      </p>
                     </div>
                   ) : (
                     <div className="grid gap-3 grid-cols-2">
                       <div
-                        onClick={() => !isLoading && document.getElementById("mykad-file-input")?.click()}
+                        onClick={() =>
+                          !isLoading &&
+                          document.getElementById("mykad-file-input")?.click()
+                        }
                         className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${
-                          isLoading ? "opacity-50" : "hover:border-primary cursor-pointer group"
+                          isLoading
+                            ? "opacity-50"
+                            : "hover:border-primary cursor-pointer group"
                         }`}
                       >
                         <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">
                           upload_file
                         </span>
-                        <p className="text-[11px] font-medium text-on-surface">Upload Image</p>
+                        <p className="text-[11px] font-medium text-on-surface">
+                          Upload Image
+                        </p>
                       </div>
                       <div
-                        onClick={() => !isLoading && document.getElementById("mykad-file-input")?.click()}
+                        onClick={() =>
+                          !isLoading &&
+                          document.getElementById("mykad-file-input")?.click()
+                        }
                         className={`border-2 border-dashed border-outline-variant rounded-xl p-4 flex flex-col items-center justify-center text-center transition-colors bg-surface-container-low ${
-                          isLoading ? "opacity-50" : "hover:border-primary cursor-pointer group"
+                          isLoading
+                            ? "opacity-50"
+                            : "hover:border-primary cursor-pointer group"
                         }`}
                       >
                         <span className="material-symbols-outlined text-2xl mb-1 text-on-surface-variant group-hover:text-primary">
                           photo_camera
                         </span>
-                        <p className="text-[11px] font-medium text-on-surface">Take Photo</p>
+                        <p className="text-[11px] font-medium text-on-surface">
+                          Take Photo
+                        </p>
                       </div>
                     </div>
                   )}
@@ -345,20 +390,25 @@ export default function RegisterPage() {
                 {name && !isParsing && (
                   <div className="bg-surface-container-low border border-outline-variant rounded-xl p-4 space-y-4 animate-fade-in">
                     <div className="flex items-center gap-2 border-b border-outline-variant pb-2">
-                      <span className="material-symbols-outlined text-primary text-lg">verified</span>
+                      <span className="material-symbols-outlined text-primary text-lg">
+                        verified
+                      </span>
                       <h3 className="text-xs font-bold text-primary uppercase tracking-wide">
                         Verify &amp; Edit Profile Details
                       </h3>
                     </div>
 
                     <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                      Please verify that the information extracted from your MyKad is correct. Edit any fields if necessary.
+                      Please verify that the information extracted from your
+                      MyKad is correct. Edit any fields if necessary.
                     </p>
 
                     <div className="space-y-3">
                       {/* Name input */}
                       <div className="space-y-1">
-                        <label className="block text-[11px] font-semibold text-on-surface">Full Name</label>
+                        <label className="block text-[11px] font-semibold text-on-surface">
+                          Full Name
+                        </label>
                         <input
                           className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
                           type="text"
@@ -372,7 +422,9 @@ export default function RegisterPage() {
                       {/* IC and Gender Grid */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-semibold text-on-surface">IC Number</label>
+                          <label className="block text-[11px] font-semibold text-on-surface">
+                            IC Number
+                          </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
                             type="text"
@@ -384,7 +436,9 @@ export default function RegisterPage() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-semibold text-on-surface">Gender</label>
+                          <label className="block text-[11px] font-semibold text-on-surface">
+                            Gender
+                          </label>
                           <select
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs cursor-pointer"
                             value={gender}
@@ -402,7 +456,9 @@ export default function RegisterPage() {
                       {/* Religion and Citizenship Grid */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-semibold text-on-surface">Religion</label>
+                          <label className="block text-[11px] font-semibold text-on-surface">
+                            Religion
+                          </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
                             type="text"
@@ -414,7 +470,9 @@ export default function RegisterPage() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="block text-[11px] font-semibold text-on-surface">Citizenship</label>
+                          <label className="block text-[11px] font-semibold text-on-surface">
+                            Citizenship
+                          </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
                             type="text"
@@ -429,7 +487,9 @@ export default function RegisterPage() {
 
                       {/* Address input */}
                       <div className="space-y-1">
-                        <label className="block text-[11px] font-semibold text-on-surface">Permanent Address (IC)</label>
+                        <label className="block text-[11px] font-semibold text-on-surface">
+                          Permanent Address (IC)
+                        </label>
                         <textarea
                           className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs resize-none"
                           rows={2}
@@ -451,7 +511,8 @@ export default function RegisterPage() {
                         disabled={isLoading}
                       />
                       <span className="text-[10px] font-medium text-on-surface-variant group-hover:text-on-surface transition-colors select-none">
-                        I confirm that my MyKad details above are correct and authentic.
+                        I confirm that my MyKad details above are correct and
+                        authentic.
                       </span>
                     </label>
                   </div>
@@ -460,20 +521,31 @@ export default function RegisterPage() {
                 <div className="pt-3 border-t border-outline-variant">
                   <button
                     type="submit"
-                    disabled={isLoading || isParsing || (name ? !isVerified : false)}
+                    disabled={
+                      isLoading || isParsing || (name ? !isVerified : false)
+                    }
                     className={`w-full py-3 font-bold rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${
                       isLoading || isParsing || (name ? !isVerified : false)
                         ? "bg-gray-400 text-white cursor-not-allowed"
                         : "bg-primary text-on-primary shadow-lg shadow-primary/20 hover:bg-primary-container active:scale-[0.98] cursor-pointer"
                     }`}
                   >
-                    <span>{isLoading ? "Creating Account..." : "Create Account"}</span>
-                    {!isLoading && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
+                    <span>
+                      {isLoading ? "Creating Account..." : "Create Account"}
+                    </span>
+                    {!isLoading && (
+                      <span className="material-symbols-outlined text-sm">
+                        arrow_forward
+                      </span>
+                    )}
                   </button>
                   <div className="mt-4 text-center">
                     <p className="text-xs text-on-surface-variant">
                       Already have an account?{" "}
-                      <Link className="text-primary font-bold hover:underline" href="/login">
+                      <Link
+                        className="text-primary font-bold hover:underline"
+                        href="/login"
+                      >
                         Log in here
                       </Link>
                     </p>
@@ -486,4 +558,14 @@ export default function RegisterPage() {
       </main>
     </div>
   );
+}
+
+function getDisplayName(name: string | undefined, email: string) {
+  const trimmedName = name?.trim() || "";
+
+  if (trimmedName && trimmedName.toLowerCase() !== "not scanned") {
+    return trimmedName;
+  }
+
+  return email.split("@")[0] || trimmedName;
 }
