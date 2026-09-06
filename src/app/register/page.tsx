@@ -3,10 +3,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { registerAccount, RegistrationPayload } from "../../lib/user_auth";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const t = useTranslations("Authentication");
+  const p = useTranslations("Profile");
+  const c = useTranslations("Common");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,19 +93,19 @@ export default function RegisterPage() {
     setErrorMsg("");
 
     if (password !== confirmPassword) {
-      setErrorMsg("Passwords do not match.");
+      setErrorMsg(t("passwordsDoNotMatch"));
       return;
     }
 
     // Sprint 4 Placeholder: Keep this until Twilio is ready!
     if (otp !== "123456") {
-      setErrorMsg("Invalid OTP code. (Hint: use 123456)");
+      setErrorMsg(t("invalidOtp"));
       return;
     }
 
     // Sprint 2 verification checkbox validation
     if (name && !isVerified) {
-      setErrorMsg("Please confirm that your MyKad details are verified.");
+      setErrorMsg(t("verifyMyKadFirst"));
       return;
     }
 
@@ -167,19 +171,18 @@ export default function RegisterPage() {
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
             <div className="max-w-xl">
               <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
-                Certificate Validation System
+                {t("certificateValidationSystem")}
               </h1>
               <p className="mt-4 max-w-lg text-base leading-7 text-[#475569]">
-                Verify applications, review official records, and manage
-                certificate requests from one secure workspace.
+                {t("systemDescription")}
               </p>
             </div>
 
             <div className="grid max-w-xl grid-cols-3 gap-3">
               {[
-                { icon: "lock", label: "Secure Access" },
-                { icon: "fact_check", label: "Review Status" },
-                { icon: "workspace_premium", label: "Official Records" },
+                { icon: "lock", label: t("secureAccess") },
+                { icon: "fact_check", label: t("reviewStatusFeature") },
+                { icon: "workspace_premium", label: t("officialRecords") },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -218,10 +221,10 @@ export default function RegisterPage() {
             <div className="w-full max-w-md bg-surface-container-lowest border border-[#E2E8F0] rounded-xl p-6 shadow-sm">
               <div className="mb-6 text-center lg:text-left">
                 <h2 className="text-xl font-semibold text-primary mb-1">
-                  Create Account
+                  {t("createAccount")}
                 </h2>
                 <p className="text-xs text-on-surface-variant">
-                  Fill in the details below to start.
+                  {t("fillDetailsBelow")}
                 </p>
               </div>
 
@@ -236,7 +239,7 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-on-surface">
-                      Email Address
+                      {t("emailAddress")}
                     </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
@@ -250,7 +253,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-on-surface">
-                      Phone Number
+                      {t("phoneNumber")}
                     </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
@@ -267,7 +270,7 @@ export default function RegisterPage() {
                 {/* OTP Verification */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold text-on-surface">
-                    OTP Verification
+                    {t("otpVerification")}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -284,7 +287,7 @@ export default function RegisterPage() {
                       type="button"
                       disabled={isLoading}
                     >
-                      Request OTP
+                      {t("requestOtp")}
                     </button>
                   </div>
                 </div>
@@ -293,7 +296,7 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-on-surface">
-                      Password
+                      {t("password")}
                     </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
@@ -307,7 +310,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-on-surface">
-                      Confirm
+                      {t("confirm")}
                     </label>
                     <input
                       className="w-full px-3 py-2.5 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
@@ -324,7 +327,7 @@ export default function RegisterPage() {
                 {/* MyKad Upload UI (Sprint 2 - Commit 1) */}
                 <div className="space-y-2">
                   <label className="block text-xs font-semibold text-on-surface">
-                    MyKad Verification
+                    {t("myKadVerification")}
                   </label>
                   <input
                     id="mykad-file-input"
@@ -338,10 +341,10 @@ export default function RegisterPage() {
                     <div className="border-2 border-dashed border-primary bg-primary/5 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-pulse">
                       <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
                       <p className="text-[11px] font-bold text-primary">
-                        Reading MyKad Data...
+                        {t("readingMyKad")}
                       </p>
                       <p className="text-[9px] text-on-surface-variant mt-0.5">
-                        Please wait, extracting details
+                        {t("extractingDetails")}
                       </p>
                     </div>
                   ) : (
@@ -361,7 +364,7 @@ export default function RegisterPage() {
                           upload_file
                         </span>
                         <p className="text-[11px] font-medium text-on-surface">
-                          Upload Image
+                          {t("uploadImage")}
                         </p>
                       </div>
                       <div
@@ -379,7 +382,7 @@ export default function RegisterPage() {
                           photo_camera
                         </span>
                         <p className="text-[11px] font-medium text-on-surface">
-                          Take Photo
+                          {t("takePhoto")}
                         </p>
                       </div>
                     </div>
@@ -394,20 +397,19 @@ export default function RegisterPage() {
                         verified
                       </span>
                       <h3 className="text-xs font-bold text-primary uppercase tracking-wide">
-                        Verify &amp; Edit Profile Details
+                        {t("verifyEditProfile")}
                       </h3>
                     </div>
 
                     <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                      Please verify that the information extracted from your
-                      MyKad is correct. Edit any fields if necessary.
+                      {t("verifyMyKadDescription")}
                     </p>
 
                     <div className="space-y-3">
                       {/* Name input */}
                       <div className="space-y-1">
                         <label className="block text-[11px] font-semibold text-on-surface">
-                          Full Name
+                          {p("fullName")}
                         </label>
                         <input
                           className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
@@ -423,7 +425,7 @@ export default function RegisterPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="block text-[11px] font-semibold text-on-surface">
-                            IC Number
+                            {p("ic")}
                           </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
@@ -437,7 +439,7 @@ export default function RegisterPage() {
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[11px] font-semibold text-on-surface">
-                            Gender
+                            {p("gender")}
                           </label>
                           <select
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs cursor-pointer"
@@ -446,9 +448,9 @@ export default function RegisterPage() {
                             required
                             disabled={isLoading}
                           >
-                            <option value="">Select</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
+                            <option value="">{p("selectGender")}</option>
+                            <option value="Male">{p("genderMale")}</option>
+                            <option value="Female">{p("genderFemale")}</option>
                           </select>
                         </div>
                       </div>
@@ -457,7 +459,7 @@ export default function RegisterPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="block text-[11px] font-semibold text-on-surface">
-                            Religion
+                            {p("religion")}
                           </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
@@ -471,7 +473,7 @@ export default function RegisterPage() {
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[11px] font-semibold text-on-surface">
-                            Citizenship
+                            {p("citizenship")}
                           </label>
                           <input
                             className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs"
@@ -488,7 +490,7 @@ export default function RegisterPage() {
                       {/* Address input */}
                       <div className="space-y-1">
                         <label className="block text-[11px] font-semibold text-on-surface">
-                          Permanent Address (IC)
+                          {p("address")}
                         </label>
                         <textarea
                           className="w-full px-3 py-2 bg-white border border-outline rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs resize-none"
@@ -511,8 +513,7 @@ export default function RegisterPage() {
                         disabled={isLoading}
                       />
                       <span className="text-[10px] font-medium text-on-surface-variant group-hover:text-on-surface transition-colors select-none">
-                        I confirm that my MyKad details above are correct and
-                        authentic.
+                        {t("confirmMyKadAuthentic")}
                       </span>
                     </label>
                   </div>
@@ -531,7 +532,7 @@ export default function RegisterPage() {
                     }`}
                   >
                     <span>
-                      {isLoading ? "Creating Account..." : "Create Account"}
+                      {isLoading ? t("creatingAccount") : t("createAccount")}
                     </span>
                     {!isLoading && (
                       <span className="material-symbols-outlined text-sm">
@@ -541,12 +542,12 @@ export default function RegisterPage() {
                   </button>
                   <div className="mt-4 text-center">
                     <p className="text-xs text-on-surface-variant">
-                      Already have an account?{" "}
+                      {t("alreadyHaveAccount")}{" "}
                       <Link
                         className="text-primary font-bold hover:underline"
                         href="/login"
                       >
-                        Log in here
+                        {t("logInHere")}
                       </Link>
                     </p>
                   </div>

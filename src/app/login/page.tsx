@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { auth } from "../../lib/firebase";
 import Link from "next/link";
-import { signIn, signInWithStaffId } from "../../lib/user_auth"; 
+import { useTranslations } from "next-intl";
+import { getUserProfile, signIn, signInWithStaffId } from "../../lib/user_auth"; 
+
 
 export default function LoginPage() {
+  const t = useTranslations("Authentication");
+  const c = useTranslations("Common");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -46,13 +53,13 @@ export default function LoginPage() {
       switch (getAuthErrorCode(err)) {
         case "auth/invalid-credential":
         case "auth/wrong-password":
-          setErrorMsg("The email or password you entered is incorrect.");
+          setErrorMsg(t("incorrectCredentials"));
           break;
         case "auth/user-not-found":
-          setErrorMsg("No account exists with this email address.");
+          setErrorMsg(t("userNotFound"));
           break;
         case "auth/too-many-requests":
-          setErrorMsg("Account temporarily locked due to too many failed attempts.");
+          setErrorMsg(t("tooManyRequests"));
           break;
         default:
           setErrorMsg(getAuthErrorMessage(err, "Failed to log in. Please try again."));
@@ -62,12 +69,43 @@ export default function LoginPage() {
     }
   };
 
+  // To prevent logged in user from accessing login page manually
+  const router = useRouter();
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(user.uid);
+
+        if (profile.role === "Admin" || profile.role === "SuperAdmin") {
+          router.replace("/staff/approval-review");
+        } else {
+          router.replace("/dashboard");
+        }
+      } catch {
+        setAuthChecking(false);
+      }
+    });
+
+    return unsubscribe;
+  }, [router]);
+
+  if (authChecking) {
+    return null;
+  }
+
   const handleSendPasswordReset = async () => {
     setErrorMsg("");
     setSuccessMsg("");
 
     if (!email.trim()) {
-      setErrorMsg("Enter your email first, then request a password reset link.");
+      setErrorMsg(t("enterEmailFirst"));
       return;
     }
 
@@ -84,7 +122,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Failed to send password reset link.");
       }
 
-      setSuccessMsg("Password reset link sent. Check your email inbox.");
+      setSuccessMsg(t("passwordResetSent"));
     } catch (err: unknown) {
       console.error(err);
       setErrorMsg(
@@ -114,18 +152,18 @@ export default function LoginPage() {
           <div className="hidden lg:flex lg:col-span-7 flex-col space-y-8 pr-10 animate-fade-in">
             <div className="max-w-xl">
               <h1 className="text-5xl font-extrabold text-[#001F45] leading-tight tracking-tight">
-                Certificate Validation System
+                {t("certificateValidationSystem")}
               </h1>
               <p className="mt-4 max-w-lg text-base leading-7 text-[#475569]">
-                Verify applications, review official records, and manage certificate requests from one secure workspace.
+                {t("systemDescription")}
               </p>
             </div>
 
             <div className="grid max-w-xl grid-cols-3 gap-3">
               {[
-                { icon: "lock", label: "Secure Access" },
-                { icon: "fact_check", label: "Review Status" },
-                { icon: "workspace_premium", label: "Official Records" },
+                { icon: "lock", label: t("secureAccess") },
+                { icon: "fact_check", label: t("reviewStatusFeature") },
+                { icon: "workspace_premium", label: t("officialRecords") },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -168,8 +206,8 @@ export default function LoginPage() {
                 </span>
               </div>
               <div className="mb-6 text-center lg:text-left">
-                <h2 className="text-2xl font-bold text-primary mb-1">Welcome Back</h2>
-                <p className="text-sm text-on-surface-variant">Please log in to access your account.</p>
+                <h2 className="text-2xl font-bold text-primary mb-1">{t("welcomeBack")}</h2>
+                <p className="text-sm text-on-surface-variant">{t("signInDescription")}</p>
               </div>
 
               {/* Error Message Display */}
@@ -187,12 +225,12 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-on-surface" htmlFor="id-user">
-                    Email / Staff ID
+                    {t("emailOrStaffIdLabel")}
                   </label>
                   <input
                     className="w-full px-4 py-2.5 bg-white border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
                     id="id-user"
-                    placeholder="Enter email or Staff ID"
+                    placeholder={t("emailOrStaffId")}
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -204,7 +242,7 @@ export default function LoginPage() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
                     <label className="block text-sm font-semibold text-on-surface" htmlFor="password">
-                      Password
+                      {t("password")}
                     </label>
                     <button
                       type="button"
@@ -212,7 +250,7 @@ export default function LoginPage() {
                       disabled={isResetSending || isLoading}
                       className="text-xs font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {isResetSending ? "Sending..." : "Forgot Password?"}
+                      {isResetSending ? t("sending") : t("forgotPassword")}
                     </button>
                   </div>
                   <div className="relative">
@@ -248,7 +286,7 @@ export default function LoginPage() {
                       className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
                       disabled={isLoading}
                     />
-                    Remember me
+                    {t("rememberMe")}
                   </label>
                 </div>
 
@@ -259,7 +297,7 @@ export default function LoginPage() {
                     isLoading ? "bg-gray-400 cursor-not-allowed text-white" : "bg-primary text-white hover:opacity-90 active:scale-[0.98] cursor-pointer"
                   }`}
                 >
-                  <span>{isLoading ? "Authenticating..." : "Log In"}</span>
+                  <span>{isLoading ? t("authenticating") : t("logIn")}</span>
                   {!isLoading && <span className="material-symbols-outlined text-lg">login</span>}
                 </button>
               </form>
@@ -271,19 +309,19 @@ export default function LoginPage() {
                 </div>
                 <div className="relative flex justify-center text-xs">
                   <span className="px-2 bg-white text-outline font-semibold uppercase tracking-widest text-[10px]">
-                    Or
+                    {c("or")}
                   </span>
                 </div>
               </div>
 
               {/* Secondary Action */}
               <div className="text-center space-y-4">
-                <p className="text-xs text-on-surface-variant">Don&apos;t have an account?</p>
+                <p className="text-xs text-on-surface-variant">{t("noAccount")}</p>
                 <Link
                   className="block w-full border border-outline text-primary font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-center text-sm"
                   href="/register"
                 >
-                  Register New Account
+                  {t("registerNewAccount")}
                 </Link>
               </div>
             </div>

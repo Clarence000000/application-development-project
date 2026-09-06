@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -19,6 +20,9 @@ export default function SecuritySettingsPage() {
   const [isPasswordResetSending, setIsPasswordResetSending] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [toastMessage, setToastMessage] = useState({ text: "", type: "" });
+  const t = useTranslations("Authentication");
+  const s = useTranslations("Settings");
+  const c = useTranslations("Common");
 
   const showToast = (text: string, type: "success" | "error") => {
     setToastMessage({ text, type });
@@ -112,7 +116,7 @@ export default function SecuritySettingsPage() {
         <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
           <div className="flex items-center gap-2 font-bold text-primary">
             <span className="material-symbols-outlined">lock</span>
-            <h2>Security & Password</h2>
+            <h2>{s("securityAndSubtitle")}</h2>
           </div>
         </div>
 
@@ -128,7 +132,7 @@ export default function SecuritySettingsPage() {
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase text-on-surface-variant">
-              Old Password
+              {t("oldPassword")}
             </label>
             <input
               type="password"
@@ -144,14 +148,14 @@ export default function SecuritySettingsPage() {
               className="mt-2 text-xs font-bold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPasswordResetSending
-                ? "Sending reset link..."
-                : "Forgot old password? Send reset link to email"}
+                ? t("sendingResetLink")
+                : t("forgotOldPassword")}
             </button>
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase text-on-surface-variant">
-              New Password
+              {t("newPassword")}
             </label>
             <input
               type="password"
@@ -164,7 +168,7 @@ export default function SecuritySettingsPage() {
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase text-on-surface-variant">
-              Confirm New Password
+              {t("confirmPassword")}
             </label>
             <input
               type="password"
@@ -187,14 +191,14 @@ export default function SecuritySettingsPage() {
               disabled={isPasswordUpdating || isPasswordResetSending}
               className="w-full rounded-lg border border-outline px-4 py-2 text-sm font-bold text-secondary transition-colors hover:bg-gray-100 sm:w-auto"
             >
-              Clear
+              {c("clear")}
             </button>
             <button
               type="submit"
               disabled={isPasswordUpdating || isPasswordResetSending}
               className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
             >
-              {isPasswordUpdating ? "Updating..." : "Confirm Update"}
+              {isPasswordUpdating ? c("updating") : t("confirmUpdate")}
             </button>
           </div>
         </form>

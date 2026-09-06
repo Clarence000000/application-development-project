@@ -18,8 +18,13 @@ import {
   type StaffApplicationNotification,
 } from "@/lib/staffNotifications";
 import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
+import { useTranslations } from "next-intl";
+import { getApplicationTitleKey } from "@/lib/applicationTitles";
 
 export default function StaffNotificationsPage() {
+  const t = useTranslations("Staff");
+  const c = useTranslations("Common");
+  const applicationT = useTranslations("Applications");
   const router = useRouter();
   const [notifications, setNotifications] = useState<StaffApplicationNotification[]>([]);
   const [staffUid, setStaffUid] = useState("");
@@ -62,7 +67,7 @@ export default function StaffNotificationsPage() {
           return;
         }
 
-        setScopeLabel(role === "SuperAdmin" ? "All mukims" : district);
+        setScopeLabel(role === "SuperAdmin" ? t("allMukims") : district);
 
         unsubscribeApplications = subscribeStaffApplicationNotifications({
           db,
@@ -128,14 +133,14 @@ export default function StaffNotificationsPage() {
       <header className="flex flex-col gap-3 border-b border-outline-variant pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary">
-            Notifications
+            {t("notifications")}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
-            Only newly submitted pending applications and pending applications that are 3 days late appear here.
+            {t("notificationsSubtitle")}
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
             <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-            Assigned Area: {scopeLabel}
+            {t("assignedArea", { scope: scopeLabel })}
           </div>
         </div>
       </header>
@@ -143,17 +148,17 @@ export default function StaffNotificationsPage() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <SummaryCard
           icon="mark_email_unread"
-          label="Unread"
+          label={t("unread")}
           value={String(unreadCount)}
         />
         <SummaryCard
           icon="outgoing_mail"
-          label="Newly Submitted"
+          label={t("newlySubmitted")}
           value={String(newSubmissionCount)}
         />
         <SummaryCard
           icon="pending_actions"
-          label="3+ Days Late"
+          label={t("overdueDays")}
           value={String(overdueCount)}
         />
       </section>
@@ -161,16 +166,16 @@ export default function StaffNotificationsPage() {
       <section className="overflow-hidden rounded-lg border border-outline-variant bg-white">
         <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
           <div>
-            <h2 className="text-sm font-bold text-primary">Priority Notifications</h2>
+            <h2 className="text-sm font-bold text-primary">{t("priorityNotifications")}</h2>
             <p className="mt-0.5 text-xs text-on-surface-variant">
-              Click a card to open the exact application in Approval Review.
+              {t("priorityNotificationsDesc")}
             </p>
           </div>
         </div>
 
         {isLoading ? (
           <div className="p-10 text-center text-sm font-medium text-secondary">
-            Loading notifications...
+            {t("loadingNotifications")}
           </div>
         ) : notifications.length > 0 ? (
           <div className="divide-y divide-outline-variant">
@@ -215,29 +220,37 @@ export default function StaffNotificationsPage() {
                         }`}
                       >
                         {notification.kind === "new_submission"
-                          ? "New Submission"
-                          : "3+ Days Late"}
+                          ? t("newSubmissionBadge")
+                          : t("overdueBadge")}
                       </span>
                       {!isRead && (
                         <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                          New
+                          {t("newBadge")}
                         </span>
                       )}
                     </div>
                     <p className="mt-1 text-xs leading-5 text-on-surface-variant">
                       {notification.kind === "new_submission"
-                        ? `${notification.applicantName} submitted a new application.`
-                        : `${notification.applicantName} has been pending for ${notification.pendingDays} days.`}
+                        ? t("submittedNewAppDesc", { name: notification.applicantName })
+                        : t("pendingDaysDesc", { name: notification.applicantName, days: notification.pendingDays })}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-outline">
-                      <span>{notification.applicationTitle}</span>
+                      <span>
+                        {(() => {
+                          const titleKey = getApplicationTitleKey(notification.formSlug);
+
+                          return titleKey
+                            ? applicationT(titleKey)
+                            : notification.applicationTitle;
+                        })()}
+                      </span>
                       <span>{notification.district}</span>
-                      <span>Submitted {formatDate(notification.submittedAt)}</span>
+                      <span>{t("submittedOn", { date: formatDate(notification.submittedAt) })}</span>
                     </div>
                   </div>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
-                  Open application
+                  {t("openApplication")}
                   <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                 </span>
               </Link>
@@ -252,10 +265,10 @@ export default function StaffNotificationsPage() {
               </span>
             </div>
             <h3 className="text-sm font-bold text-on-surface">
-              No priority notifications
+              {t("noPriorityNotifications")}
             </h3>
             <p className="mt-1 max-w-xs text-xs text-on-surface-variant">
-              New submissions and applications that pass the 3-day pending threshold will appear here.
+              {t("noPriorityNotificationsDesc")}
             </p>
           </div>
         )}

@@ -21,6 +21,8 @@ import {
   createInAppNotification,
   triggerEmailNotification,
 } from "@/lib/notifications";
+import { useLocale, useTranslations } from "next-intl";
+import { getApplicationTitleKey } from "@/lib/applicationTitles";
 
 type ApprovalStatus =
   | "Pending Review"
@@ -99,6 +101,10 @@ export default function ApprovalReviewPage() {
 }
 
 function ApprovalReviewContent() {
+  const t = useTranslations("Staff");
+  const applicationT = useTranslations("Applications");
+  const c = useTranslations("Common");
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const focusedReference = searchParams.get("focus");
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
@@ -211,6 +217,7 @@ function ApprovalReviewContent() {
                   applicationSnapshot.id,
                   application,
                   user,
+                  applicationT,
                 );
               }),
           );
@@ -252,7 +259,7 @@ function ApprovalReviewContent() {
       isActive = false;
       unsubscribe();
     };
-  }, [isSuperAdmin, staffDistrict, staffRole]);
+  }, [isSuperAdmin, staffDistrict, staffRole, locale, applicationT]);
 
   const selectedApplication = applications.find(
     (application) => application.documentId === selectedId,
@@ -589,45 +596,45 @@ function ApprovalReviewContent() {
       <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-primary">
-            Approval Review
+            {t("approvalReviewTitle")}
           </h1>
           <p className="mt-0.5 max-w-2xl text-sm text-secondary">
             {isSuperAdmin
-              ? "Review submissions across all seven mukims."
-              : "Review applications assigned to your administrative area only."}
+              ? t("approvalReviewSubSuper")
+              : t("approvalReviewSubStaff")}
           </p>
           <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-xs font-semibold text-on-surface">
             <span className="material-symbols-outlined text-[16px] text-primary">
               location_on
             </span>
             {isSuperAdmin
-              ? "Scope: All mukims"
-              : `Assigned area: ${staffDistrict}`}
+              ? t("scopeAllMukims")
+              : t("assignedAreaPrefix", { area: staffDistrict })}
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 xl:w-auto">
           <StatusSummary
-            label="Pending"
+            label={t("pendingReview")}
             value={counts.pending}
             tone="bg-secondary-container text-on-secondary-container"
           />
           <StatusSummary
-            label="Vetted"
+            label={t("vetted")}
             value={counts.vetted}
             tone="bg-blue-100 text-blue-800"
           />
           <StatusSummary
-            label="Action"
+            label={t("action")}
             value={counts.actionRequired}
             tone="bg-yellow-100 text-yellow-800"
           />
           <StatusSummary
-            label="Approved"
+            label={t("approved")}
             value={counts.approved}
             tone="bg-green-100 text-green-800"
           />
           <StatusSummary
-            label="Rejected"
+            label={t("rejected")}
             value={counts.rejected}
             tone="bg-error-container text-on-error-container"
           />
@@ -638,7 +645,7 @@ function ApprovalReviewContent() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
           <div className="md:col-span-7">
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
-              Search
+              {c("search")}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">
@@ -646,7 +653,7 @@ function ApprovalReviewContent() {
               </span>
               <input
                 className="w-full rounded-lg border border-outline bg-surface-container-low py-2 pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                placeholder="Search by application ID, applicant, or form name"
+                placeholder={t("searchApplications")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -654,7 +661,7 @@ function ApprovalReviewContent() {
           </div>
           <div className="md:col-span-3">
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
-              Status
+              {c("status")}
             </label>
             <select
               className="w-full rounded-lg border border-outline bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
@@ -663,12 +670,12 @@ function ApprovalReviewContent() {
                 setStatusFilter(event.target.value as "All" | ApprovalStatus)
               }
             >
-              <option>All</option>
-              <option>Pending Review</option>
-              <option>Staff Vetted</option>
-              <option>Action Required</option>
-              <option>Approved</option>
-              <option>Rejected</option>
+              <option value="All">{c("all")}</option>
+              <option value="Pending Review">{t("pendingReview")}</option>
+              <option value="Staff Vetted">{t("staffVetted")}</option>
+              <option value="Action Required">{t("actionRequired")}</option>
+              <option value="Approved">{t("approved")}</option>
+              <option value="Rejected">{t("rejected")}</option>
             </select>
           </div>
           <button
@@ -681,7 +688,7 @@ function ApprovalReviewContent() {
             <span className="material-symbols-outlined text-[18px]">
               restart_alt
             </span>
-            Clear
+            {c("clear")}
           </button>
         </div>
       </section>
@@ -690,14 +697,15 @@ function ApprovalReviewContent() {
         <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
           <div>
             <h2 className="text-sm font-bold text-primary">
-              Application Queue
+              {t("applicationQueue")}
             </h2>
             <p className="text-[11px] font-medium text-on-surface-variant">
               {isLoading
-                ? "Loading application records..."
-                : `${filteredApplications.length} ${
-                    isSuperAdmin ? "total" : "assigned"
-                  } record(s) shown`}
+                ? t("loadingRecords")
+                : t("recordsShown", {
+                    count: filteredApplications.length,
+                    scope: isSuperAdmin ? t("total") : t("assigned"),
+                  })}
             </p>
           </div>
           <span className="material-symbols-outlined text-outline">
@@ -709,13 +717,13 @@ function ApprovalReviewContent() {
           <table className="w-full border-collapse text-left">
             <thead className="bg-surface-container-low text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
               <tr>
-                <th className="px-4 py-3">Application</th>
-                <th className="px-4 py-3">Applicant</th>
-                <th className="px-4 py-3">Form</th>
-                <th className="px-4 py-3">district</th>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-center">Action</th>
+                <th className="px-4 py-3">{t("application")}</th>
+                <th className="px-4 py-3">{t("applicant")}</th>
+                <th className="px-4 py-3">{t("form")}</th>
+                <th className="px-4 py-3">{t("district")}</th>
+                <th className="px-4 py-3">{t("submittedCol")}</th>
+                <th className="px-4 py-3">{c("status")}</th>
+                <th className="px-4 py-3 text-center">{c("action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -748,7 +756,7 @@ function ApprovalReviewContent() {
                               <span className="material-symbols-outlined text-[11px]">
                                 warning
                               </span>
-                              &gt;3 Days Overdue
+                              {t("daysOverdue")}
                             </span>
                           )}
                         </div>
@@ -770,14 +778,14 @@ function ApprovalReviewContent() {
                       {application.submittedDate}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={application.status} />
+                      <StatusBadge status={application.status} translate={t} />
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-outline bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
                         onClick={() => setSelectedId(application.documentId)}
                       >
-                        View
+                        {t("view")}
                         <span className="material-symbols-outlined text-[15px]">
                           chevron_right
                         </span>
@@ -811,13 +819,13 @@ function ApprovalReviewContent() {
                       <span className="text-[10px] font-bold uppercase tracking-wide text-outline">
                         {application.id}
                       </span>
-                      <StatusBadge status={application.status} />
+                      <StatusBadge status={application.status} translate={t} />
                       {application.isUrgent && (
                         <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">
                           <span className="material-symbols-outlined text-[11px]">
                             warning
                           </span>
-                          &gt;3 Days Overdue
+                          {t("daysOverdue")}
                         </span>
                       )}
                     </div>
@@ -854,10 +862,10 @@ function ApprovalReviewContent() {
               search_off
             </span>
             <p className="mt-2 text-sm font-bold text-on-surface">
-              No matching applications
+              {t("noMatchingApplications")}
             </p>
             <p className="mt-1 text-xs text-on-surface-variant">
-              Adjust the search keyword or status filter.
+              {t("adjustSearchFilter")}
             </p>
           </div>
         )}
@@ -867,7 +875,7 @@ function ApprovalReviewContent() {
         <div className="fixed inset-0 z-50 flex justify-end bg-black/45">
           <button
             className="absolute inset-0 cursor-default"
-            aria-label="Close application detail"
+            aria-label={t("closeApplicationDetail")}
             onClick={() => {
               setSelectedId(null);
             }}
@@ -899,15 +907,14 @@ function ApprovalReviewContent() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                    Application Detail
+                    {t("applicationDetail")}
                   </p>
                   <p className="mt-1 text-xs text-on-surface-variant">
-                    Review supporting information and record the latest
-                    decision.
+                    {t("applicationDetailDesc")}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={selectedApplication.status} />
+                  <StatusBadge status={selectedApplication.status} translate={t} />
                   <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-bold text-on-surface-variant">
                     {selectedApplication.district}
                   </span>
@@ -919,37 +926,37 @@ function ApprovalReviewContent() {
               <div className="space-y-5">
                 <section>
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-                    Applicant Details
+                    {t("applicantDetails")}
                   </h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <DetailItem
-                      label="IC Number"
+                      label={t("icNumber")}
                       value={selectedApplication.idNumber}
                     />
                     <DetailItem
-                      label="Phone Number"
+                      label={t("phoneNumber")}
                       value={selectedApplication.phoneNumber}
                     />
                     <DetailItem
-                      label="Email"
+                      label={t("email")}
                       value={selectedApplication.emailAddress}
                     />
                     <DetailItem
-                      label="District"
+                      label={t("district")}
                       value={selectedApplication.district}
                     />
                     <DetailItem
-                      label="Submitted Date"
+                      label={t("submittedDate")}
                       value={selectedApplication.submittedDate}
                     />
                   </div>
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <DetailItem
-                      label="Address"
+                      label={t("address")}
                       value={selectedApplication.address}
                     />
                     <DetailItem
-                      label="Purpose"
+                      label={t("purpose")}
                       value={selectedApplication.purpose}
                     />
                   </div>
@@ -958,18 +965,20 @@ function ApprovalReviewContent() {
                 {selectedApplication.resubmittedDocumentUrl && (
                   <section>
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-                      Resubmitted Document
+                      {t("resubmittedDocument")}
                     </h3>
                     <div className="rounded-lg border-2 border-green-300 bg-green-50 p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-green-700 text-[18px]">attach_file</span>
+                        <span className="material-symbols-outlined text-green-700 text-[18px]">
+                          attach_file
+                        </span>
                         <a
                           href={selectedApplication.resubmittedDocumentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-semibold text-green-800 hover:underline"
                         >
-                          View Resubmitted Document
+                          {t("viewResubmittedDocument")}
                         </a>
                       </div>
                       <span className="rounded-full bg-green-700 px-2 py-0.5 text-[10px] font-bold text-white">
@@ -982,11 +991,11 @@ function ApprovalReviewContent() {
                 <section>
                   <div>
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-                      Review Notes
+                      {t("reviewNotes")}
                     </h3>
                     <div className="min-h-24 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface">
                       {selectedApplication.supportingNotes ||
-                        "No office remarks recorded yet."}
+                        t("noOfficeRemarks")}
                     </div>
                   </div>
                 </section>
@@ -995,7 +1004,7 @@ function ApprovalReviewContent() {
               <aside className="space-y-4">
                 <section>
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-                    Approval Record
+                    {t("approvalRecord")}
                   </h3>
                   <div className="space-y-2">
                     {selectedApplication.timeline.map((step) => (
@@ -1033,19 +1042,19 @@ function ApprovalReviewContent() {
 
                 <section className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
                   <h3 className="text-xs font-bold uppercase tracking-wide text-primary">
-                    AI Review Assistant
+                    {t("aiReviewAssistance")}
                   </h3>
                   <div className="mt-3 grid grid-cols-1 gap-2">
                     <AiActionButton
                       icon="summarize"
-                      label="Generate Summary"
+                      label={t("generateSummary")}
                       loading={aiLoadingTask === "staff_summary"}
                       disabled={Boolean(aiLoadingTask)}
                       onClick={() => runAiReview("staff_summary")}
                     />
                     <AiActionButton
                       icon="plagiarism"
-                      label="Suggest Missing Docs"
+                      label={t("suggestMissingDocs")}
                       loading={aiLoadingTask === "missing_documents"}
                       disabled={Boolean(aiLoadingTask)}
                       onClick={() => runAiReview("missing_documents")}
@@ -1065,33 +1074,33 @@ function ApprovalReviewContent() {
 
                 <section className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
                   <h3 className="text-xs font-bold uppercase tracking-wide text-primary">
-                    Decision Actions
+                    {t("decisionActions")}
                   </h3>
                   <div className="mt-3 space-y-2">
                     <DecisionActionButton
                       icon="fact_check"
-                      label="Mark as Staff Vetted"
+                      label={t("markAsStaffVetted")}
                       tone="outline"
                       disabled={isUpdating || staffVettedDisabled}
                       onClick={() => openDecisionModal("Staff Vetted")}
                     />
                     <DecisionActionButton
                       icon="upload_file"
-                      label="Request Missing Document"
+                      label={t("requestMissingDocument")}
                       tone="warning"
                       disabled={isUpdating}
                       onClick={() => openDecisionModal("Action Required")}
                     />
                     <DecisionActionButton
                       icon="verified"
-                      label="Approve"
+                      label={t("approve")}
                       tone="approve"
                       disabled={isUpdating || approveDisabled}
                       onClick={() => openDecisionModal("Approved")}
                     />
                     <DecisionActionButton
                       icon="cancel"
-                      label="Reject"
+                      label={t("reject")}
                       tone="reject"
                       disabled={isUpdating || rejectDisabled}
                       onClick={() => openDecisionModal("Rejected")}
@@ -1113,11 +1122,10 @@ function ApprovalReviewContent() {
                   {selectedApplication.id}
                 </p>
                 <h2 className="mt-1 text-lg font-bold text-primary">
-                  {getDecisionModalTitle(pendingDecisionStatus)}
+                  {getDecisionModalTitle(pendingDecisionStatus, t)}
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-                  Add a remark manually, generate an AI draft for this exact
-                  decision, or continue with an empty remark.
+                  {t("remarkDesc")}
                 </p>
               </div>
               <button
@@ -1133,23 +1141,23 @@ function ApprovalReviewContent() {
             <div className="space-y-3 px-4 py-4">
               <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Target Status
+                  {t("targetStatus")}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
-                  <StatusBadge status={pendingDecisionStatus} />
+                  <StatusBadge status={pendingDecisionStatus} translate={t} />
                   <span className="text-xs font-medium text-on-surface-variant">
-                    AI drafts will be written for this selected status only.
+                    {t("aiDraftTargetStatusHint")}
                   </span>
                 </div>
               </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-primary">
-                  Remark
+                  {t("remark")}
                 </span>
                 <textarea
                   className="min-h-36 w-full rounded-lg border border-outline bg-white p-3 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                  placeholder="Leave empty or generate a draft remark"
+                  placeholder={t("remarkPlaceholder")}
                   value={decisionRemark}
                   onChange={(event) => setDecisionRemark(event.target.value)}
                 />
@@ -1169,7 +1177,7 @@ function ApprovalReviewContent() {
                 disabled={isUpdating || decisionAiLoading}
                 onClick={closeDecisionModal}
               >
-                Cancel
+                {c("cancel")}
               </button>
               <button
                 type="button"
@@ -1180,7 +1188,7 @@ function ApprovalReviewContent() {
                 <span className="material-symbols-outlined text-[16px]">
                   {decisionAiLoading ? "progress_activity" : "edit_note"}
                 </span>
-                {decisionAiLoading ? "Generating..." : "Generate Draft"}
+                {decisionAiLoading ? t("generating") : t("generateDraft")}
               </button>
               <button
                 type="button"
@@ -1191,7 +1199,7 @@ function ApprovalReviewContent() {
                 <span className="material-symbols-outlined text-[16px]">
                   check_circle
                 </span>
-                Confirm {pendingDecisionStatus}
+                {t("confirmStatus", { status: pendingDecisionStatus })}
               </button>
             </div>
           </section>
@@ -1363,6 +1371,7 @@ function mapApplicationRecord(
   documentId: string,
   application: Record<string, unknown>,
   user: Record<string, unknown>,
+  translate: (key: string) => string,
 ): ApplicationRecord {
   const values = readRecord(application.values, application.formData);
   const status = mapApprovalStatus(application);
@@ -1377,6 +1386,9 @@ function mapApplicationRecord(
   const rejectedAt = formatFirestoreDate(application.rejectedAt);
   const actionRequiredAt = formatFirestoreDate(application.actionRequiredAt);
 
+  const formSlug = readString(application.formSlug, application.type);
+  const titleKey = getApplicationTitleKey(formSlug);
+
   return {
     documentId,
     id:
@@ -1385,9 +1397,10 @@ function mapApplicationRecord(
     uid: readString(application.uid, application.userId),
     applicantName: readString(values.name, user.name) || "Unknown Applicant",
     idNumber: readString(values.idNumber, user.icNumber) || "-",
-    formName:
-      readString(application.formType, application.title) ||
-      "Office Application",
+    formName: titleKey
+      ? translate(titleKey)
+      : readString(application.formType, application.title) ||
+        "Office Application",
     submittedDate,
     district:
       readString(
@@ -1489,6 +1502,24 @@ function mapApprovalStatus(
   return "Pending Review";
 }
 
+function getStatusLabel(
+  status: ApprovalStatus,
+  t: (key: string) => string,
+) {
+  switch (status) {
+    case "Pending Review":
+      return t("pendingReview");
+    case "Staff Vetted":
+      return t("staffVetted");
+    case "Action Required":
+      return t("actionRequired");
+    case "Approved":
+      return t("approved");
+    case "Rejected":
+      return t("rejected");
+  }
+}
+
 function formatFirestoreDate(value: unknown) {
   const date = toDate(value);
 
@@ -1556,7 +1587,13 @@ function StatusSummary({
   );
 }
 
-function StatusBadge({ status }: { status: ApprovalStatus }) {
+function StatusBadge({
+  status,
+  translate,
+}: {
+  status: ApprovalStatus;
+  translate: (key: string) => string;
+}) {
   const style = statusStyles[status];
 
   return (
@@ -1564,28 +1601,29 @@ function StatusBadge({ status }: { status: ApprovalStatus }) {
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-      {status}
+      {getStatusLabel(status, translate)}
     </span>
   );
 }
 
-function getDecisionModalTitle(status: ApprovalStatus) {
+function getDecisionModalTitle(
+  status: ApprovalStatus,
+  t?: (key: string, values?: Record<string, string | number>) => string,
+) {
   if (status === "Action Required") {
-    return "Request Missing Document";
+    return t ? t("requestDocModalTitle") : "Request Missing Document";
   }
 
   if (status === "Staff Vetted") {
-    return "Mark as Staff Vetted";
+    return t ? t("markVettedModalTitle") : "Mark as Staff Vetted";
   }
 
-  return `${status} Application`;
+  return t ? t("statusApplicationTitle", { status }) : `${status} Application`;
 }
 
 type DecisionAction = "staff_vetted" | "approve" | "reject";
 
-function getDecisionAction(
-  nextStatus: ApprovalStatus,
-): DecisionAction | null {
+function getDecisionAction(nextStatus: ApprovalStatus): DecisionAction | null {
   if (nextStatus === "Staff Vetted") return "staff_vetted";
   if (nextStatus === "Approved") return "approve";
   if (nextStatus === "Rejected") return "reject";

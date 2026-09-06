@@ -20,6 +20,8 @@ import {
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { deleteDraftApplicationDocument } from "@/lib/applications";
 import { createInAppNotification } from "@/lib/notifications";
+import { useTranslations } from "next-intl";
+import { getApplicationTitleKey } from "@/lib/applicationTitles";
 
 interface Application {
   documentId: string;
@@ -71,6 +73,9 @@ export default function ReviewStatusPage() {
 
 function ReviewStatusContent() {
   const router = useRouter();
+  const t = useTranslations("ReviewStatus");
+  const applicationT = useTranslations("Applications");
+  const c = useTranslations("Common");
   const searchParams = useSearchParams();
   const focusedId = searchParams.get("focus");
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -89,6 +94,23 @@ function ReviewStatusContent() {
   const [resubmitProgress, setResubmitProgress] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "In Review":
+        return t("inReview");
+      case "Approved":
+        return t("approved");
+      case "Rejected":
+        return t("rejected");
+      case "Draft":
+        return t("draft");
+      case "Action Required":
+        return t("actionRequired");
+      default:
+        return status;
+    }
+  };
 
   useEffect(() => {
     if (!focusedId || isLoading || applications.length === 0) return;
@@ -140,6 +162,7 @@ function ReviewStatusContent() {
               mapFirestoreApplication(
                 documentSnapshot.id,
                 documentSnapshot.data(),
+                applicationT,
               ),
             )
             .sort((left, right) => right.sortTime - left.sortTime)
@@ -169,7 +192,7 @@ function ReviewStatusContent() {
       unsubscribeApplications?.();
       unsubscribeAuth();
     };
-  }, [router]);
+  }, [router, applicationT]);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -328,11 +351,10 @@ function ReviewStatusContent() {
       {/* Header Section */}
       <section className="space-y-1">
         <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-tight">
-          Review Status
+          {t("title")}
         </h1>
         <p className="text-sm text-on-surface-variant max-w-xl">
-          Track the progress of your submitted documents and verification
-          requests. Real-time updates on your official government applications.
+          {t("subtitle")}
         </p>
       </section>
 
@@ -341,7 +363,7 @@ function ReviewStatusContent() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           <div className="md:col-span-6">
             <label className="block text-xs font-bold text-primary mb-1.5 uppercase tracking-wide">
-              Search Application ID / Title
+              {t("searchLabel")}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
@@ -349,7 +371,7 @@ function ReviewStatusContent() {
               </span>
               <input
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm text-on-surface"
-                placeholder="e.g. APP- or Residence"
+                placeholder={t("searchPlaceholder")}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -358,19 +380,19 @@ function ReviewStatusContent() {
           </div>
           <div className="md:col-span-4">
             <label className="block text-xs font-bold text-primary mb-1.5 uppercase tracking-wide">
-              Status Filter
+              {t("statusFilterLabel")}
             </label>
             <select
               className="w-full px-3 py-2 bg-surface-container-low border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm text-on-surface cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option>All Statuses</option>
-              <option>In Review</option>
-              <option>Approved</option>
-              <option>Rejected</option>
-              <option>Draft</option>
-              <option>Action Required</option>
+              <option value="All Statuses">{t("allStatuses")}</option>
+              <option value="In Review">{t("inReview")}</option>
+              <option value="Approved">{t("approved")}</option>
+              <option value="Rejected">{t("rejected")}</option>
+              <option value="Draft">{t("draft")}</option>
+              <option value="Action Required">{t("actionRequired")}</option>
             </select>
           </div>
           <div className="md:col-span-2">
@@ -384,7 +406,7 @@ function ReviewStatusContent() {
               <span className="material-symbols-outlined text-[18px]">
                 restart_alt
               </span>
-              Clear
+              {c("clear")}
             </button>
           </div>
         </div>
@@ -476,7 +498,7 @@ function ReviewStatusContent() {
               <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-3 md:pt-0 border-outline-variant">
                 <div className="flex flex-col items-end">
                   <span className="text-[9px] font-bold text-outline mb-0.5 uppercase tracking-wide">
-                    Current Status
+                    {t("currentStatus")}
                   </span>
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${app.statusBg} ${app.statusColor}`}
@@ -484,7 +506,9 @@ function ReviewStatusContent() {
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${app.statusDot}`}
                     ></span>
-                    <span className="text-xs font-semibold">{app.status}</span>
+                    <span className="text-xs font-semibold">
+                      {getStatusLabel(app.status)}
+                    </span>
                   </div>
                 </div>
                 {app.status === "Draft" ? (
@@ -499,14 +523,14 @@ function ReviewStatusContent() {
                         delete
                       </span>
                       {deletingDraftId === app.documentId
-                        ? "Deleting..."
-                        : "Delete"}
+                        ? c("deleting")
+                        : c("delete")}
                     </button>
                     <Link
                       href={app.link || "/new-application"}
                       className="bg-primary text-white font-semibold text-xs px-4 py-2 rounded-lg hover:opacity-95 active:scale-95 transition-all flex items-center gap-1"
                     >
-                      Resume
+                      {t("resume")}
                       <span className="material-symbols-outlined text-[16px]">
                         arrow_forward
                       </span>
@@ -530,7 +554,7 @@ function ReviewStatusContent() {
                       onClick={() => setSelectedApp(app)}
                       className="bg-surface-container-highest text-primary font-semibold text-xs px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all flex items-center gap-1 cursor-pointer"
                     >
-                      View Details
+                      {t("viewDetails")}
                       <span className="material-symbols-outlined text-[16px]">
                         chevron_right
                       </span>
@@ -546,10 +570,10 @@ function ReviewStatusContent() {
               search_off
             </span>
             <h4 className="text-sm font-bold text-on-surface">
-              No applications found
+              {t("noApplicationsFound")}
             </h4>
             <p className="text-xs text-on-surface-variant mt-1 max-w-xs font-medium">
-              No applications found.
+              {t("noApplicationsDesc")}
             </p>
           </div>
         )}
@@ -565,10 +589,10 @@ function ReviewStatusContent() {
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
-              Total Approved
+              {t("totalApproved")}
             </div>
             <div className="text-sm font-bold text-primary">
-              {approvedCount} Applications
+              {t("applicationsCount", { count: approvedCount })}
             </div>
           </div>
         </div>
@@ -580,10 +604,10 @@ function ReviewStatusContent() {
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
-              In Progress
+              {t("inProgress")}
             </div>
             <div className="text-sm font-bold text-primary">
-              {inReviewCount} Applications
+              {t("applicationsCount", { count: inReviewCount })}
             </div>
           </div>
         </div>
@@ -595,10 +619,10 @@ function ReviewStatusContent() {
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
-              Pending Action
+              {t("pendingAction")}
             </div>
             <div className="text-sm font-bold text-yellow-700">
-              {actionRequiredCount} Applications
+              {t("applicationsCount", { count: actionRequiredCount })}
             </div>
           </div>
         </div>
@@ -610,10 +634,10 @@ function ReviewStatusContent() {
           </div>
           <div>
             <div className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tight">
-              Rejected
+              {t("rejected")}
             </div>
             <div className="text-sm font-bold text-error">
-              {rejectedCount} Applications
+              {t("applicationsCount", { count: rejectedCount })}
             </div>
           </div>
         </div>
@@ -654,7 +678,7 @@ function ReviewStatusContent() {
               <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/45 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-on-surface-variant">
-                    Application Status
+                    {t("currentStatus")}
                   </span>
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${selectedApp.statusBg} ${selectedApp.statusColor}`}
@@ -662,7 +686,7 @@ function ReviewStatusContent() {
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${selectedApp.statusDot}`}
                     ></span>
-                    {selectedApp.status}
+                    {getStatusLabel(selectedApp.status)}
                   </div>
                 </div>
 
@@ -673,7 +697,7 @@ function ReviewStatusContent() {
                     </span>
                     <div>
                       <p className="text-green-900 font-bold">
-                        AI-Validated Serial Number
+                        {t("aiValidatedSerial")}
                       </p>
                       <p className="text-green-800 font-semibold">
                         {selectedApp.serialNumber}
@@ -686,7 +710,7 @@ function ReviewStatusContent() {
               {selectedApp.officeRemark && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
-                    Office Remark
+                    {t("officeRemark")}
                   </h4>
                   <div className="rounded-xl border border-outline-variant bg-surface-container-low p-3 text-sm leading-6 text-on-surface">
                     <FormattedOfficeRemark text={selectedApp.officeRemark} />
@@ -697,12 +721,12 @@ function ReviewStatusContent() {
               {/* Application Details Summary */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
-                  Document Metadata
+                  {t("documentMetadata")}
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
                     <span className="text-on-surface-variant block font-medium">
-                      Date Filed
+                      {t("dateFiled")}
                     </span>
                     <span className="font-bold text-on-surface mt-0.5 block">
                       {selectedApp.date}
@@ -710,7 +734,7 @@ function ReviewStatusContent() {
                   </div>
                   <div>
                     <span className="text-on-surface-variant block font-medium">
-                      Authority Agency
+                      {t("authorityAgency")}
                     </span>
                     <span className="font-bold text-on-surface mt-0.5 block">
                       {selectedApp.meta}
@@ -722,7 +746,7 @@ function ReviewStatusContent() {
               {/* Status Timeline */}
               <div className="space-y-4">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
-                  Audit Timeline
+                  {t("auditTimeline")}
                 </h4>
                 <div className="relative border-l border-outline-variant/60 ml-3 pl-5 space-y-5 py-1">
                   {selectedApp.timeline.map((step, idx) => (
@@ -764,7 +788,7 @@ function ReviewStatusContent() {
               {selectedApp.status === "Action Required" && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-primary uppercase tracking-wide border-b border-outline-variant pb-1.5">
-                    Upload Required Document
+                    {t("uploadRequiredDoc")}
                   </h4>
                   <div
                     className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all cursor-pointer ${
@@ -788,10 +812,10 @@ function ReviewStatusContent() {
                       cloud_upload
                     </span>
                     <p className="text-xs font-semibold text-on-surface">
-                      Drag & drop your file here
+                      {t("dragDropText")}
                     </p>
                     <p className="text-[10px] text-on-surface-variant mt-1">
-                      or click to browse · PDF, JPG, PNG accepted
+                      {t("fileUploadHint")}
                     </p>
                   </div>
 
@@ -836,7 +860,7 @@ function ReviewStatusContent() {
                   <span className="material-symbols-outlined text-sm">
                     download
                   </span>
-                  Download PDF
+                  {t("downloadCertificate")}
                 </a>
               )}
               {selectedApp.status === "Action Required" && (
@@ -848,7 +872,7 @@ function ReviewStatusContent() {
                   {resubmitLoading ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Uploading
+                      {t("uploading")}
                       {resubmitProgress !== null ? ` ${resubmitProgress}%` : ""}
                       ...
                     </>
@@ -857,7 +881,7 @@ function ReviewStatusContent() {
                       <span className="material-symbols-outlined text-sm">
                         cloud_upload
                       </span>
-                      Submit Document
+                      {t("submitDocument")}
                     </>
                   )}
                 </button>
@@ -869,7 +893,7 @@ function ReviewStatusContent() {
                 }}
                 className="flex-grow border border-outline text-secondary text-xs font-bold py-2.5 rounded-lg hover:bg-surface-container transition-all cursor-pointer text-center"
               >
-                Close Drawer
+                {t("closeDrawer")}
               </button>
             </div>
           </div>
@@ -896,11 +920,10 @@ function ReviewStatusContent() {
             <div className="flex items-start gap-3">
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-on-surface">
-                  Delete this draft?
+                  {t("deleteDraftQuestion")}
                 </h3>
                 <p className="text-sm leading-6 text-on-surface-variant">
-                  This will permanently remove {draftToDelete.id}. You will not
-                  be able to recover it.
+                  {t("deleteDraftWarning", { id: draftToDelete.id })}
                 </p>
               </div>
             </div>
@@ -911,7 +934,7 @@ function ReviewStatusContent() {
                 onClick={() => setDraftToDelete(null)}
                 className="flex-1 rounded-lg border border-outline px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container"
               >
-                Cancel
+                {c("cancel")}
               </button>
               <button
                 type="button"
@@ -924,8 +947,8 @@ function ReviewStatusContent() {
                 className="flex-1 rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingDraftId === draftToDelete.documentId
-                  ? "Deleting..."
-                  : "Delete"}
+                  ? c("deleting")
+                  : c("delete")}
               </button>
             </div>
           </div>
@@ -959,6 +982,7 @@ function getResubmissionErrorMessage(error: unknown) {
 function mapFirestoreApplication(
   id: string,
   data: Record<string, unknown>,
+  translate: (key: string) => string,
 ): Application & { sortTime: number } {
   const submittedDate = toDate(data.submittedAt);
   const status = mapStatus(data.status, submittedDate);
@@ -972,8 +996,12 @@ function mapFirestoreApplication(
     data.officeComment || data.rejectionReason || data.staffComment,
   );
   const formSlug = readString(data.formSlug) || readString(data.type);
-  const title =
-    readString(data.formType) || readString(data.title) || "Office Application";
+  const titleKey = getApplicationTitleKey(formSlug);
+  const title = titleKey
+    ? translate(titleKey)
+    : readString(data.formType) ||
+      readString(data.title) ||
+      "Office Application";
   const displayDate = status === "Draft" ? updatedAt : submittedAt;
 
   return {

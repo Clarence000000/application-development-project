@@ -16,9 +16,12 @@ import {
   type NotificationHistoryItem,
   type NotificationPreferences,
 } from "@/lib/notifications";
+import { useTranslations } from "next-intl";
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const t = useTranslations("Notifications");
+  const c = useTranslations("Common");
   const [userId, setUserId] = useState("");
   const [preferences, setPreferences] =
     useState<NotificationPreferences | null>(null);
@@ -154,17 +157,17 @@ export default function NotificationsPage() {
       <header className="flex flex-col gap-3 border-b border-outline-variant pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary">
-            Notifications
+            {t("title")}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
-            Manage alerts and review updates for your applications.
+            {t("manageAlertsDesc")}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center justify-center gap-2 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary">
           <span className="material-symbols-outlined text-[17px]">
             mark_email_unread
           </span>
-          <span>{unreadCount} unread</span>
+          <span>{t("unreadCount", { count: unreadCount })}</span>
         </div>
       </header>
 
@@ -172,14 +175,14 @@ export default function NotificationsPage() {
         <aside className="rounded-lg border border-outline-variant bg-white p-4">
           <div className="flex items-start justify-between gap-3 border-b border-outline-variant pb-3">
             <div>
-              <h2 className="text-sm font-bold text-primary">Preferences</h2>
+              <h2 className="text-sm font-bold text-primary">{t("preferences")}</h2>
               <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-                Choose which alerts should reach you.
+                {t("chooseAlertsDesc")}
               </p>
             </div>
             {isSaving && (
               <span className="rounded-full bg-secondary-container px-2 py-1 text-[10px] font-bold text-on-secondary-container">
-                Saving
+                {t("saving")}
               </span>
             )}
           </div>
@@ -188,13 +191,13 @@ export default function NotificationsPage() {
             <div className="mt-5 space-y-6">
               <div className="space-y-3">
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-outline">
-                  Delivery Methods
+                  {t("deliveryMethods")}
                 </h3>
                 <div className="space-y-2">
                   <PreferenceToggle
                     checked={preferences.emailEnabled}
                     icon="mail"
-                    label="Email"
+                    label={t("email")}
                     onChange={(checked) =>
                       updatePreference("emailEnabled", checked)
                     }
@@ -202,7 +205,7 @@ export default function NotificationsPage() {
                   <PreferenceToggle
                     checked={preferences.smsEnabled}
                     icon="sms"
-                    label="SMS"
+                    label={t("sms")}
                     onChange={(checked) =>
                       updatePreference("smsEnabled", checked)
                     }
@@ -212,7 +215,7 @@ export default function NotificationsPage() {
 
               <div className="space-y-3">
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-outline">
-                  Alert Topics
+                  {t("alertTopics")}
                 </h3>
                 <div className="space-y-2">
                   <PreferenceToggle
@@ -221,7 +224,7 @@ export default function NotificationsPage() {
                       !preferences.emailEnabled && !preferences.smsEnabled
                     }
                     icon="outgoing_mail"
-                    label="Application submitted"
+                    label={t("appSubmitted")}
                     onChange={(checked) =>
                       updatePreference("applicationSubmitted", checked)
                     }
@@ -232,7 +235,7 @@ export default function NotificationsPage() {
                       !preferences.emailEnabled && !preferences.smsEnabled
                     }
                     icon="published_with_changes"
-                    label="Status updates"
+                    label={t("statusUpdates")}
                     onChange={(checked) =>
                       updatePreference("statusUpdates", checked)
                     }
@@ -243,7 +246,7 @@ export default function NotificationsPage() {
                       !preferences.emailEnabled && !preferences.smsEnabled
                     }
                     icon="upload_file"
-                    label="Document requests"
+                    label={t("docRequests")}
                     onChange={(checked) =>
                       updatePreference("documentRequests", checked)
                     }
@@ -266,9 +269,9 @@ export default function NotificationsPage() {
         <section className="flex max-h-[calc(100vh-220px)] min-h-[520px] flex-col overflow-hidden rounded-lg border border-outline-variant bg-white">
           <div className="flex flex-col gap-3 border-b border-outline-variant px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-bold text-primary">History</h2>
+              <h2 className="text-sm font-bold text-primary">{t("history")}</h2>
               <p className="mt-0.5 text-xs text-on-surface-variant">
-                {history.length} notification record(s)
+                {t("recordsCount", { count: history.length })}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +283,7 @@ export default function NotificationsPage() {
                 <span className="material-symbols-outlined text-[16px]">
                   delete_sweep
                 </span>
-                Clear all
+                {t("clearAll")}
               </button>
               <button
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-40"
@@ -290,7 +293,7 @@ export default function NotificationsPage() {
                 <span className="material-symbols-outlined text-[16px]">
                   done_all
                 </span>
-                Mark all read
+                {t("markAllRead")}
               </button>
             </div>
           </div>
@@ -298,7 +301,7 @@ export default function NotificationsPage() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {isLoading ? (
               <div className="p-10 text-center text-sm font-medium text-secondary">
-                Loading notification history...
+                {t("loadingHistory")}
               </div>
             ) : history.length > 0 ? (
               <div className="divide-y divide-outline-variant">
@@ -307,6 +310,7 @@ export default function NotificationsPage() {
                     key={notification.id}
                     notification={notification}
                     onMarkRead={handleMarkRead}
+                    t={t}
                   />
                 ))}
               </div>
@@ -318,11 +322,10 @@ export default function NotificationsPage() {
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-on-surface">
-                  No notifications yet
+                  {t("noNotificationsFound")}
                 </h3>
                 <p className="mt-1 max-w-xs text-xs text-on-surface-variant">
-                  Alerts and updates will appear here automatically when there is
-                  activity on your applications.
+                  {t("noNotificationsDesc2")}
                 </p>
               </div>
             )}
@@ -388,9 +391,11 @@ function PreferenceToggle({
 function NotificationHistoryRow({
   notification,
   onMarkRead,
+  t,
 }: {
   notification: NotificationHistoryItem;
   onMarkRead: (notification: NotificationHistoryItem) => void;
+  t: any;
 }) {
   return (
     <div className="flex flex-col gap-3 px-4 py-4 transition hover:bg-surface-container-low sm:flex-row sm:items-start sm:justify-between">
@@ -409,16 +414,16 @@ function NotificationHistoryRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-on-surface">
-              {notification.title}
+              {getNotificationTitle(notification, t)}
             </h3>
             {!notification.read && (
               <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                New
+                {t("new")}
               </span>
             )}
           </div>
           <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-            {notification.message}
+            {getNotificationMessage(notification, t)}
           </p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-outline">
             <span>{formatNotificationDate(notification.createdAt)}</span>
@@ -446,7 +451,7 @@ function NotificationHistoryRow({
             onClick={() => onMarkRead(notification)}
             type="button"
           >
-            Mark read
+            {t("markRead")}
           </button>
         )}
         {notification.referenceNumber && (
@@ -454,12 +459,78 @@ function NotificationHistoryRow({
             className="text-xs font-bold text-primary hover:underline"
             href={`/review-status?focus=${encodeURIComponent(notification.referenceNumber)}`}
           >
-            View status
+            {t("viewStatus")}
           </Link>
         )}
       </div>
     </div>
   );
+}
+
+// For notification translation extracted from approval review for notifications page
+function getNotificationMessage(
+  notification: NotificationHistoryItem,
+  t: any,
+) {
+  if (notification.eventType === "application_submitted") {
+    return t("applicationSubmittedMessage", {
+      application: notification.applicationTitle,
+      reference: notification.referenceNumber,
+    });
+  }
+
+  if (notification.eventType === "status_updated") {
+    if (notification.message.includes("approved")) {
+      return t("approvedMessage", {
+        application: notification.applicationTitle,
+        reference: notification.referenceNumber,
+      });
+    }
+
+    if (notification.message.includes("rejected")) {
+      return t("rejectedMessage", {
+        application: notification.applicationTitle,
+        reference: notification.referenceNumber,
+      });
+    }
+
+    return t("statusUpdatedMessage", {
+      application: notification.applicationTitle,
+      reference: notification.referenceNumber,
+    });
+  }
+
+  return notification.message;
+}
+
+// Same as above translation but for title
+function getNotificationTitle(
+  notification: NotificationHistoryItem,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
+  if (notification.eventType === "application_submitted") {
+    return t("applicationSubmittedTitle");
+  }
+
+  if (notification.eventType === "status_updated") {
+    const message = notification.message.toLowerCase();
+
+    if (message.includes("approved")) {
+      return t("applicationStatusTitle", { status: t("approved") });
+    }
+
+    if (message.includes("rejected")) {
+      return t("applicationStatusTitle", { status: t("rejected") });
+    }
+
+    return t("applicationStatusTitle", { status: t("updated") });
+  }
+
+  if (notification.eventType === "document_requested") {
+    return t("actionRequiredTitle");
+  }
+
+  return notification.title;
 }
 
 function ChannelStatusBadge({

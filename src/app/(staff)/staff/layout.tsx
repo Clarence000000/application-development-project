@@ -21,23 +21,26 @@ import {
   type StaffApplicationNotification,
 } from "@/lib/staffNotifications";
 import { SUPERADMIN_EMAIL, type UserRole } from "@/lib/user_auth";
-
-const navItems = [
-  {
-    name: "Approval Review",
-    href: "/staff/approval-review",
-    icon: "how_to_reg",
-  },
-  {
-    name: "Notifications",
-    href: "/staff/notifications",
-    icon: "notifications",
-  },
-];
+import { useTranslations } from "next-intl";
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("Staff");
+  const nav = useTranslations("Navigation");
   const pathname = usePathname();
   const router = useRouter();
+
+  const navItems = [
+    {
+      name: t("approvalReview"),
+      href: "/staff/approval-review",
+      icon: "how_to_reg",
+    },
+    {
+      name: t("notifications"),
+      href: "/staff/notifications",
+      icon: "notifications",
+    },
+  ];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -160,15 +163,19 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     });
   }
 
-  const handleLogout = async (event: React.MouseEvent) => {
-    event.preventDefault();
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+
     try {
-      await signOut(auth); // Terminate session on Firebase servers
-      localStorage.removeItem("userRole"); // Wipe local cache token
-      router.push("/login"); // Securely redirect away
+      await signOut(auth);
+      router.replace("/login");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Logout failed:", error);
     }
+  };
+
+  const handleSettings = () => {
+    router.push("/staff/settings");
   };
 
   const toggleSidebar = () => {
@@ -186,7 +193,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center gap-4">
           <button
             type="button"
-            aria-label="Toggle staff sidebar menu"
+            aria-label={t("toggleSidebar")}
             aria-expanded={desktopSidebarOpen || mobileMenuOpen}
             onClick={toggleSidebar}
             className="material-symbols-outlined rounded-full p-1.5 text-gray-900 transition hover:bg-gray-50"
@@ -194,7 +201,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             menu
           </button>
           <span className="text-base font-bold tracking-tight text-[#002D62]">
-            Staff Portal
+            {t("staffPortal")}
           </span>
         </div>
 
@@ -223,9 +230,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-outline-variant bg-white py-2 shadow-lg">
                 <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
                   <div>
-                    <p className="text-xs font-bold text-gray-500">Notifications</p>
+                    <p className="text-xs font-bold text-gray-500">{t("notifications")}</p>
                     <p className="mt-0.5 text-[10px] font-semibold text-outline">
-                      {activeCount} active · {unreadCount} unread
+                      {t("activeUnread", { active: activeCount, unread: unreadCount })}
                     </p>
                   </div>
                   <Link
@@ -233,7 +240,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                     href="/staff/notifications"
                     onClick={() => setNotifOpen(false)}
                   >
-                    View all
+                    {nav("viewAll")}
                   </Link>
                 </div>
                 {notifications.length > 0 ? (
@@ -264,8 +271,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                             </p>
                             <p className="mt-0.5 line-clamp-2 text-[10px] text-on-surface-variant">
                               {notification.kind === "new_submission"
-                                ? "New submission"
-                                : `Pending for ${notification.pendingDays} days`} · {notification.applicantName}
+                                ? t("newSubmission")
+                                : t("pendingDaysCount", { days: notification.pendingDays })} · {notification.applicantName}
                             </p>
                             <p className="mt-1 text-[9px] font-semibold text-outline">
                               {notification.applicationTitle}
@@ -281,7 +288,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                       notifications_off
                     </span>
                     <p className="mt-1 text-xs font-semibold text-on-surface">
-                      No staff notifications
+                      {t("noStaffNotifications")}
                     </p>
                   </div>
                 )}
@@ -319,9 +326,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               {/* 2. Actual Dropdown Menu Box */}
               <div className="absolute right-0 z-50 mt-2 w-52 rounded-lg border border-[#E2E8F0] bg-white py-2 shadow-lg">
                 <div className="border-b border-gray-100 px-3 py-2">
-                  <p className="text-xs font-bold text-on-surface">Staff Account</p>
+                  <p className="text-xs font-bold text-on-surface">{t("staffAccount")}</p>
                   <p className="text-[10px] font-medium text-on-surface-variant">
-                    Staff Workspace
+                    {t("staffWorkspace")}
                   </p>
                 </div>
                 <button
@@ -329,7 +336,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                   className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm text-error hover:bg-error-container/20"
                 >
                   <span className="material-symbols-outlined text-sm">logout</span>
-                  Log Out
+                  {nav("logOut")}
                 </button>
               </div>
             </>
@@ -357,9 +364,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 </span>
               </div>
               <div>
-                <h2 className="text-sm font-bold leading-tight text-[#002D62]">Staff Portal</h2>
+                <h2 className="text-sm font-bold leading-tight text-[#002D62]">{t("staffPortal")}</h2>
                 <p className="text-[10px] font-medium text-gray-500">
-                  Administrative Workspace
+                  {t("administrativeWorkspace")}
                 </p>
               </div>
             </div>
@@ -392,11 +399,18 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
           <div className="border-t border-gray-100 px-2 pt-3">
             <button
+              onClick={handleSettings}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-500 hover:bg-gray-50 hover:text-[#002D62] transition-all text-sm font-semibold cursor-pointer text-left"
+            >
+              <span className="material-symbols-outlined text-xl">settings</span>
+              <span>{nav("settings")}</span>
+            </button>
+            <button
               onClick={handleLogout}
               className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-gray-500 transition hover:text-error"
             >
               <span className="material-symbols-outlined text-xl">logout</span>
-              Logout
+              {nav("logOut")}
             </button>
           </div>
         </aside>
@@ -405,14 +419,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           <>
             <button
               className="fixed inset-0 z-40 bg-black/50 md:hidden"
-              aria-label="Close staff menu"
+              aria-label={t("closeMenu")}
               onClick={() => setMobileMenuOpen(false)}
             />
             <aside className="fixed bottom-0 left-0 top-0 z-50 flex w-60 flex-col border-r border-[#E2E8F0] bg-white py-4 transition-transform duration-300 ease-out md:hidden">
               <div className="mb-6 flex items-center justify-between px-5">
                 <div>
-                  <h2 className="text-sm font-bold text-[#002D62]">Staff Portal</h2>
-                  <p className="text-[10px] font-medium text-gray-500">Administrative Workspace</p>
+                  <h2 className="text-sm font-bold text-[#002D62]">{t("staffPortal")}</h2>
+                  <p className="text-[10px] font-medium text-gray-500">{t("administrativeWorkspace")}</p>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}

@@ -2,9 +2,11 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export default function NewApplicationPage() {
   const router = useRouter();
+  const t = useTranslations("Applications");
 
   const handleStartApplication = (route: string) => {
     router.push(route);
@@ -14,10 +16,9 @@ export default function NewApplicationPage() {
     <div className="space-y-6">
       {/* Header Section */}
       <div>
-        <h1 className="text-2xl font-bold text-primary mb-1 tracking-tight">New Application</h1>
+        <h1 className="text-2xl font-bold text-primary mb-1 tracking-tight">{t("newApplication")}</h1>
         <p className="text-on-surface-variant text-sm max-w-3xl">
-          Select the certificate or verification form you wish to apply for. Ensure you have all
-          digital copies of the required documents ready before starting.
+          {t("description")}
         </p>
       </div>
 
@@ -38,34 +39,33 @@ export default function NewApplicationPage() {
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 inline-block">
-                    Residential
+                    {t("residential")}
                   </span>
-                  <h2 className="text-lg font-bold text-primary">Residential Verification Form</h2>
+                  <h2 className="text-lg font-bold text-primary">{t("residentialVerification")}</h2>
                 </div>
                 <span className="material-symbols-outlined text-primary-container text-[20px]">
                   home_pin
                 </span>
               </div>
               <p className="text-on-surface-variant text-[13px] mb-4">
-                Official verification of your current residential status in this district for
-                administrative, school registration, or utility application purposes.
+                {t("residentialDesc")}
               </p>
               <div className="bg-surface-container-low p-3 rounded-lg mb-4">
                 <h3 className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-                  Required Documents
+                  {t("requiredDocuments")}
                 </h3>
                 <ul className="grid grid-cols-2 gap-2">
                   <li className="flex items-center gap-2 text-[11px] text-on-surface">
                     <span className="material-symbols-outlined text-[14px] text-primary">
                       check_circle
                     </span>
-                    IC Copy (Front &amp; Back)
+                    {t("docIcCopy")}
                   </li>
                   <li className="flex items-center gap-2 text-[11px] text-on-surface">
                     <span className="material-symbols-outlined text-[14px] text-primary">
                       check_circle
                     </span>
-                    Utility Bill (Water/Electric)
+                    {t("docUtilityBill")}
                   </li>
                 </ul>
               </div>
@@ -74,7 +74,7 @@ export default function NewApplicationPage() {
               onClick={() => handleStartApplication("/residential_verification")}
               className="w-full bg-primary text-on-primary font-bold py-2.5 px-6 rounded-lg hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
-              <span>Start Application</span>
+              <span>{t("startApplication")}</span>
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
           </div>
@@ -93,29 +93,29 @@ export default function NewApplicationPage() {
             <div>
               <div className="mb-2">
                 <span className="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 inline-block">
-                  Finance
+                  {t("finance")}
                 </span>
-                <h2 className="text-lg font-bold text-primary">Income Verification Form</h2>
+                <h2 className="text-lg font-bold text-primary">{t("incomeVerification")}</h2>
               </div>
               <p className="text-on-surface-variant text-[13px] mb-4">
-                Verification of household income specifically for self-employed individuals.
+                {t("incomeDesc")}
               </p>
               <div className="bg-surface-container-low p-3 rounded-lg mb-4">
                 <h3 className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-                  Required Documents
+                  {t("requiredDocuments")}
                 </h3>
                 <ul className="space-y-1.5">
                   <li className="flex items-center gap-2 text-[11px] text-on-surface">
                     <span className="material-symbols-outlined text-[14px] text-primary">
                       check_circle
                     </span>
-                    Income Declaration Form
+                    {t("docIncomeDeclaration")}
                   </li>
                   <li className="flex items-center gap-2 text-[11px] text-on-surface">
                     <span className="material-symbols-outlined text-[14px] text-primary">
                       check_circle
                     </span>
-                    Supporting Evidence
+                    {t("docSupportingEvidence")}
                   </li>
                 </ul>
               </div>
@@ -124,7 +124,7 @@ export default function NewApplicationPage() {
               onClick={() => handleStartApplication("/income_verification")}
               className="w-full bg-primary text-on-primary font-bold py-2.5 px-6 rounded-lg hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
-              <span>Start Application</span>
+              <span>{t("startApplication")}</span>
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
           </div>
@@ -136,40 +136,38 @@ export default function NewApplicationPage() {
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="bg-error-container text-on-error-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
-                  Appeal
+                  {t("appeal")}
                 </span>
-                <h2 className="text-xl font-bold text-primary">Identity Card Fine Appeal</h2>
+                <h2 className="text-xl font-bold text-primary">{t("identityCardFineAppeal")}</h2>
               </div>
               <p className="text-on-surface-variant text-[14px] mb-6 max-w-xl">
-                Formal appeal for the reduction or waiver of fines related to IC loss or damage due
-                to theft, natural disasters, or extreme financial hardship.
+                {t("fineAppealDesc")}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-                    Eligibility
+                    {t("eligibility")}
                   </h3>
                   <p className="text-[12px] text-on-surface-variant leading-relaxed">
-                    Available to B40 category citizens or those affected by documented emergency
-                    circumstances.
+                    {t("eligibilityB40Desc")}
                   </p>
                 </div>
                 <div>
                   <h3 className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-                    Required Documents
+                    {t("requiredDocuments")}
                   </h3>
                   <ul className="space-y-1.5">
                     <li className="flex items-center gap-2 text-[12px] text-on-surface">
                       <span className="material-symbols-outlined text-[16px] text-primary">
                         description
                       </span>
-                      Police Report (For theft/loss)
+                      {t("docPoliceReport")}
                     </li>
                     <li className="flex items-center gap-2 text-[12px] text-on-surface">
                       <span className="material-symbols-outlined text-[16px] text-primary">
                         description
                       </span>
-                      B40 Verification (If applicable)
+                      {t("docB40Verification")}
                     </li>
                   </ul>
                 </div>
@@ -180,12 +178,12 @@ export default function NewApplicationPage() {
                 onClick={() => handleStartApplication("/ic_penalty_appeal")}
                 className="sm:w-56 bg-primary text-on-primary font-bold py-3 px-6 rounded-lg hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
               >
-                <span>Start Application</span>
+                <span>{t("startApplication")}</span>
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
               <button className="sm:w-56 border border-outline text-primary font-bold py-3 px-6 rounded-lg hover:bg-surface-container transition-all flex items-center justify-center gap-2 text-sm cursor-pointer">
                 <span className="material-symbols-outlined text-[18px]">info</span>
-                <span>Read Guidelines</span>
+                <span>{t("readGuidelines")}</span>
               </button>
             </div>
           </div>
@@ -204,9 +202,9 @@ export default function NewApplicationPage() {
       {/* FAQ / Help Section */}
       <section className="mt-8 bg-primary-container text-on-primary-container p-6 rounded-xl flex flex-col md:flex-row items-center gap-6">
         <div className="text-center md:text-left flex-1">
-          <h3 className="text-lg font-bold mb-1">Need assistance with your application?</h3>
+          <h3 className="text-lg font-bold mb-1">{t("needAssistance")}</h3>
           <p className="text-on-primary-container/80 text-[13px]">
-            Our help desk is available from 8:00 AM to 5:00 PM on working days to assist you.
+            {t("helpDeskTime")}
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -214,13 +212,13 @@ export default function NewApplicationPage() {
             className="bg-on-primary text-primary-container px-5 py-2.5 rounded-lg font-bold text-[13px] hover:bg-opacity-90 transition-all"
             href="#"
           >
-            Help Center
+            {t("helpCenter")}
           </a>
           <a
             className="border border-on-primary text-on-primary px-5 py-2.5 rounded-lg font-bold text-[13px] hover:bg-white/10 transition-all"
             href="#"
           >
-            Contact Us
+            {t("contactUs")}
           </a>
         </div>
       </section>

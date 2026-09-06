@@ -50,6 +50,20 @@ function normalizeUserProfile(profile: UserProfile): UserProfile {
   };
 }
 
+// Prevent anonymous from accessing certain web path by grabbing user profile
+export async function getUserProfile(uid: string): Promise<UserProfile> {
+  const snapshot = await getDoc(doc(db, "users", uid));
+
+  if (!snapshot.exists()) {
+    throw new Error("User profile not found");
+  }
+
+  return {
+    uid,
+    ...(snapshot.data() as Omit<UserProfile, "uid">),
+  };
+}
+
 export const signIn = async (email: string, password: string): Promise<UserProfile> => {
   // 1. Authenticate via Firebase
   const userCredential = await signInWithEmailAndPassword(auth, email, password);

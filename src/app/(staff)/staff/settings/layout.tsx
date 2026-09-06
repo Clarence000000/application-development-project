@@ -6,32 +6,22 @@ import { useTranslations } from "next-intl";
 
 const settingsItems = [
   {
-    href: "/settings/profile",
-    icon: "person",
-    title: "profile",
-  },
-  {
-    href: "/settings/security",
-    icon: "lock",
-    title: "security",
-  },
-  {
-    href: "/settings/language",
+    href: "/staff/settings/language",
     icon: "language",
     title: "language",
   },
   {
-    href: "/settings/theme",
+    href: "/staff/settings/theme",
     icon: "palette",
     title: "theme",
   },
   {
-    href: "/settings/notifications",
+    href: "/staff/settings/notifications",
     icon: "notifications",
     title: "notifications",
   },
   {
-    href: "/settings/support",
+    href: "/staff/settings/support",
     icon: "help",
     title: "support",
   },

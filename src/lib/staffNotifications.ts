@@ -16,6 +16,7 @@ export type StaffApplicationNotificationKind = "new_submission" | "overdue_pendi
 export type StaffApplicationNotification = {
   documentId: string;
   referenceNumber: string;
+  formSlug: string;
   applicationTitle: string;
   applicantName: string;
   district: string;
@@ -140,12 +141,14 @@ export function mapStaffApplicationNotification(
   }
 
   const values = readRecord(application.values, application.formData);
+  const formSlug = readString(application.formSlug, application.type);
 
   return {
     documentId,
     referenceNumber:
       readString(application.referenceNumber, application.applicationId) || documentId,
-    applicationTitle:
+    formSlug,
+      applicationTitle:
       readString(application.formType, application.title) || "Office Application",
     applicantName: readString(values.name, application.applicantName) || "Unknown Applicant",
     district: readString(application.district) || "Unassigned District",

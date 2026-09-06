@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { useTranslations } from "next-intl";
 
 type UserProfile = {
   name: string;
@@ -33,6 +34,8 @@ export default function ProfileSettingsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState({ text: "", type: "" });
+  const t = useTranslations("Profile");
+  const c = useTranslations("Common");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -116,7 +119,7 @@ export default function ProfileSettingsPage() {
         <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
           <div className="flex items-center gap-2 font-bold text-primary">
             <span className="material-symbols-outlined">person</span>
-            <h2>Profile Settings</h2>
+            <h2>{t("title")}</h2>
           </div>
           {!isEditing && (
             <button
@@ -124,7 +127,7 @@ export default function ProfileSettingsPage() {
               className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20"
             >
               <span className="material-symbols-outlined text-[16px]">edit</span>
-              Edit Profile
+              {t("edit")}
             </button>
           )}
         </div>
@@ -132,7 +135,7 @@ export default function ProfileSettingsPage() {
         <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
           <div className="border-b border-outline-variant pb-5 md:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase text-on-surface-variant">
-              Email Address
+              {t("email")}
             </label>
             <input
               type="text"
@@ -141,54 +144,57 @@ export default function ProfileSettingsPage() {
               className="w-full cursor-not-allowed rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface opacity-70"
             />
             <p className="mt-1 text-[10px] text-on-surface-variant">
-              Email cannot be changed directly.
+              {t("emailDescription")}
             </p>
           </div>
 
-          <ProfileField label="Full Name" value={isEditing ? editForm.name : profile.name} isEditing={isEditing} onChange={(v) => handleEditChange("name", v)} />
-          <ProfileField label="IC Number" value={isEditing ? editForm.icNumber : profile.icNumber} isEditing={isEditing} onChange={(v) => handleEditChange("icNumber", v)} />
-          <ProfileField label="Phone Number" value={isEditing ? editForm.phoneNumber : profile.phoneNumber} isEditing={isEditing} onChange={(v) => handleEditChange("phoneNumber", v)} />
+          <ProfileField label={t("fullName")} value={isEditing ? editForm.name : profile.name} isEditing={isEditing} onChange={(v) => handleEditChange("name", v)} />
+          <ProfileField label={t("ic")} value={isEditing ? editForm.icNumber : profile.icNumber} isEditing={isEditing} onChange={(v) => handleEditChange("icNumber", v)} />
+          <ProfileField label={t("phoneNumber")} value={isEditing ? editForm.phoneNumber : profile.phoneNumber} isEditing={isEditing} onChange={(v) => handleEditChange("phoneNumber", v)} />
 
           <SelectField
-            label="Gender"
+            label={t("gender")}
             value={isEditing ? editForm.gender : profile.gender}
             isEditing={isEditing}
             options={[
-              ["", "Select Gender"],
-              ["Lelaki", "Male"],
-              ["Perempuan", "Female"],
+              ["", t("selectGender")],
+              ["Lelaki", t("genderMale")],
+              ["Perempuan", t("genderFemale")],
             ]}
             onChange={(value) => handleEditChange("gender", value)}
+            t={t}
           />
           <SelectField
-            label="Religion"
+            label={t("religion")}
             value={isEditing ? editForm.religion : profile.religion}
             isEditing={isEditing}
             options={[
-              ["", "Select Religion"],
-              ["Islam", "Islam"],
-              ["Buddha", "Buddha"],
-              ["Hindu", "Hindu"],
-              ["Kristian", "Christian"],
-              ["Lain-lain", "Others"],
+              ["", t("selectReligion")],
+              ["Islam", t("religionIslam")],
+              ["Buddha", t("religionBuddha")],
+              ["Hindu", t("religionHindu")],
+              ["Kristian", t("religionChristian")],
+              ["Lain-lain", t("religionOther")],
             ]}
             onChange={(value) => handleEditChange("religion", value)}
+            t={t}
           />
           <SelectField
-            label="Citizenship"
+            label={t("citizenship")}
             value={isEditing ? editForm.citizenship : profile.citizenship}
             isEditing={isEditing}
             options={[
-              ["", "Select Citizenship"],
-              ["Warganegara", "Citizen"],
-              ["Bukan Warganegara", "Non-citizen"],
+              ["", t("selectCitizenship")],
+              ["Warganegara", t("citizenshipCitizen")],
+              ["Bukan Warganegara", t("citizenshipNonCitizen")],
             ]}
             onChange={(value) => handleEditChange("citizenship", value)}
+            t={t}
           />
 
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase text-on-surface-variant">
-              Address (IC)
+              {t("address")}
             </label>
             {isEditing ? (
               <textarea
@@ -212,14 +218,14 @@ export default function ProfileSettingsPage() {
               disabled={isSaving}
               className="rounded-lg border border-outline px-4 py-2 text-sm font-bold text-secondary transition-colors hover:bg-gray-100 disabled:opacity-50"
             >
-              Cancel
+              {c("cancel")}
             </button>
             <button
               onClick={handleSaveProfile}
               disabled={isSaving}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving ? c("saving") : c("save")}
             </button>
           </div>
         )}
@@ -241,14 +247,17 @@ function getDisplayName(name: string | undefined, email: string) {
   return email.split("@")[0] || trimmedName;
 }
 
-function formatProfileValue(value: string) {
+function formatProfileValue(value: string, t: any) {
   const labels: Record<string, string> = {
-    Lelaki: "Male",
-    Perempuan: "Female",
-    Kristian: "Christian",
-    "Lain-lain": "Others",
-    Warganegara: "Citizen",
-    "Bukan Warganegara": "Non-citizen",
+    Lelaki: t("genderMale"),
+    Perempuan: t("genderFemale"),
+    Islam: t("religionIslam"),
+    Buddha: t("religionBuddha"),
+    Hindu: t("religionHindu"),
+    Kristian: t("religionChristian"),
+    "Lain-lain": t("religionOther"),
+    Warganegara: t("citizenshipCitizen"),
+    "Bukan Warganegara": t("citizenshipNonCitizen"),
   };
 
   return labels[value] || value;
@@ -292,12 +301,14 @@ function SelectField({
   isEditing,
   options,
   onChange,
+  t,
 }: {
   label: string;
   value: string;
   isEditing: boolean;
   options: [string, string][];
   onChange: (value: string) => void;
+  t?: any;
 }) {
   if (!isEditing) {
     return (
@@ -306,7 +317,7 @@ function SelectField({
           {label}
         </label>
         <p className="py-2 text-sm font-semibold text-on-surface">
-          {formatProfileValue(value) || "-"}
+          {(t ? formatProfileValue(value, t) : value) || "-"}
         </p>
       </div>
     );

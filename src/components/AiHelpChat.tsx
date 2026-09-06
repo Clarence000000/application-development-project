@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type ChatMessage = {
   id: string;
@@ -14,20 +15,15 @@ type AiHelpChatProps = {
   introMessage?: string;
 };
 
-const applicantIntroMessage =
-  "Hi, I am the MyPerakuan AI Assistant. I can help you choose a form, understand application status, explain missing document requests, and guide you around the portal.";
-
-const staffIntroMessage =
-  "Hi, I am the MyPerakuan Staff AI Assistant. I can help summarize the current review page, explain status actions, draft concise remarks, and guide staff workflows.";
-
 export default function AiHelpChat({
   audience = "applicant",
   pageContext = "",
   introMessage,
 }: AiHelpChatProps) {
+  const t = useTranslations("AiHelp");
   const resolvedIntroMessage =
     introMessage ||
-    (audience === "staff" ? staffIntroMessage : applicantIntroMessage);
+    (audience === "staff" ? t("staffIntro") : t("applicantIntro"));
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -221,15 +217,15 @@ export default function AiHelpChat({
                 support_agent
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-bold">AI Assistant</h2>
+                <h2 className="truncate text-sm font-bold">{t("title")}</h2>
                 <p className="text-[10px] font-medium text-white/80">
-                  MyPerakuan help
+                  {t("subtitle")}
                 </p>
               </div>
             </div>
             <button
               type="button"
-              aria-label="Close AI assistant"
+              aria-label={t("closeAssistant")}
               className="material-symbols-outlined rounded-full p-1 text-[20px] transition hover:bg-white/15"
               onClick={() => setIsOpen(false)}
             >
@@ -267,7 +263,7 @@ export default function AiHelpChat({
               {isSending && (
                 <div className="flex justify-start">
                   <div className="rounded-lg border border-outline-variant bg-white px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                    Thinking...
+                    {t("thinking")}
                   </div>
                 </div>
               )}
@@ -276,7 +272,7 @@ export default function AiHelpChat({
             <div
               className="absolute bottom-3 right-2 top-3 w-3 cursor-pointer rounded-full"
               onClick={scrollToProgress}
-              aria-label="Chat context navigation"
+              aria-label={t("contextNavigation")}
             >
               <div
                 className="absolute bottom-0 right-1 top-0 w-1 rounded-full bg-outline-variant/55"
@@ -294,7 +290,7 @@ export default function AiHelpChat({
                     type="button"
                     className="group absolute right-0 h-3 w-3 -translate-y-1/2 rounded-full border border-white bg-primary shadow-sm transition hover:scale-125"
                     style={{ top: `${markerPositions[message.id] ?? 100}%` }}
-                    aria-label={`Jump to previous input: ${message.text}`}
+                    aria-label={t("jumpToInput", { text: message.text })}
                     onClick={(event) => {
                       event.stopPropagation();
                       scrollToMessage(message.id);
@@ -317,7 +313,7 @@ export default function AiHelpChat({
                 <span className="material-symbols-outlined text-[15px]">
                   keyboard_arrow_down
                 </span>
-                Latest
+                {t("latest")}
               </button>
             )}
           </div>
@@ -329,7 +325,7 @@ export default function AiHelpChat({
             <div className="flex items-end gap-2">
               <textarea
                 className="max-h-28 min-h-10 flex-1 resize-none rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
-                placeholder="Ask about forms, status, or missing documents"
+                placeholder={t("askPlaceholder")}
                 rows={1}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
@@ -342,7 +338,7 @@ export default function AiHelpChat({
               />
               <button
                 type="submit"
-                aria-label="Send message"
+                aria-label={t("sendMessage")}
                 disabled={!input.trim() || isSending}
                 className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-[20px] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -355,7 +351,7 @@ export default function AiHelpChat({
 
       <button
         type="button"
-        aria-label="Open AI help assistant"
+        aria-label={t("openAssistant")}
         aria-expanded={isOpen}
         className="fixed bottom-20 right-4 z-[69] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl transition hover:scale-105 hover:opacity-95 md:bottom-6 md:right-6"
         onClick={() => setIsOpen((current) => !current)}

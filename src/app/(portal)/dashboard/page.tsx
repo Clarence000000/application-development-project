@@ -3,8 +3,10 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { getApplicationTitleKey } from "@/lib/applicationTitles";
 import {
   doc,
   getDoc,
@@ -27,6 +29,10 @@ type RawApplication = { id: string } & Record<string, unknown>;
 
 export default function DashboardPage() {
   const router = useRouter();
+  const t = useTranslations("Dashboard");
+  const applicationT = useTranslations("Applications");
+  const navigation = useTranslations("Navigation");
+  const locale = useLocale();
   const [userName, setUserName] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,16 +47,18 @@ export default function DashboardPage() {
       if (user) {
         try {
           setIsLoading(true);
-                    // 1. Fetch user's profile details
+          // 1. Fetch user's profile details
           const userRef = doc(db, "users", user.uid);
           const userSnap = await getDoc(userRef);
-          
+
           if (userSnap.exists() && userSnap.data()?.name != "Not Scanned") {
             // User scanned IC and has a name
             setUserName(userSnap.data().name);
           } else {
             // User didn't scan IC or has no name, use email without domain
-            const emailName = user.email ? user.email.split('@')[0] : "Pemohon";
+            const emailName = user.email
+              ? user.email.split("@")[0]
+              : t("defaultApplicant");
             setUserName(emailName);
           }
 
@@ -63,10 +71,12 @@ export default function DashboardPage() {
           unsubscribeApplications = onSnapshot(
             q,
             (querySnap) => {
-              const rawAppsList: RawApplication[] = querySnap.docs.map((documentSnapshot) => ({
-                id: documentSnapshot.id,
-                ...(documentSnapshot.data() as Record<string, unknown>),
-              }));
+              const rawAppsList: RawApplication[] = querySnap.docs.map(
+                (documentSnapshot) => ({
+                  id: documentSnapshot.id,
+                  ...(documentSnapshot.data() as Record<string, unknown>),
+                }),
+              );
 
               // 1. Sort by the raw Firestore timestamp FIRST (descending)
               rawAppsList.sort((a, b) => {
@@ -76,15 +86,25 @@ export default function DashboardPage() {
               });
 
               // 2. Format and map to the specific properties need for the UI
-              const appsList: Application[] = rawAppsList.map((data) => ({
-                id: readString(data.referenceNumber, data.applicationId, data.id),
-                type: readString(data.formSlug, data.type),
-                title:
-                  readString(data.formType, data.title) ||
-                  "Permohonan Penghulu",
-                submittedAt: formatFirestoreDate(data.submittedAt),
-                status: readString(data.status) || "In Review",
-              }));
+              const appsList: Application[] = rawAppsList.map((data) => {
+                const formSlug = readString(data.formSlug, data.type);
+                const titleKey = getApplicationTitleKey(formSlug);
+
+                return {
+                  id: readString(
+                    data.referenceNumber,
+                    data.applicationId,
+                    data.id,
+                  ),
+                  type: formSlug,
+                  title: titleKey
+                    ? applicationT(titleKey)
+                    : readString(data.formType, data.title) ||
+                      t("defaultFormTitle"),
+                  submittedAt: formatFirestoreDate(data.submittedAt, locale),
+                  status: readString(data.status) || "In Review",
+                };
+              });
 
               setApplications(appsList.slice(0, 3));
               setIsLoading(false);
@@ -110,7 +130,7 @@ export default function DashboardPage() {
       unsubscribeApplications?.();
       unsubscribe();
     };
-  }, [router]);
+  }, [router, locale, applicationT, t]);
 
   const handleCardClick = (href: string) => {
     router.push(href);
@@ -121,8 +141,8 @@ export default function DashboardPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-primary mb-0.5">
           {isLoading
-            ? "Please wait..."
-            : `Welcome back, ${userName || "Pemohon"}!`}
+            ? t("pleaseWait")
+            : t("welcomeBack", { name: userName || t("defaultApplicant") })}
         </h1>
       </header>
 
@@ -130,13 +150,13 @@ export default function DashboardPage() {
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-on-surface">
-            Apply for a Certificate
+            {t("applyForCertificate")}
           </h2>
           <Link
             className="text-primary text-sm font-semibold hover:underline flex items-center gap-1"
             href="/new-application"
           >
-            <span>View All</span>
+            <span>{navigation("viewAll")}</span>
             <span className="material-symbols-outlined text-sm">
               arrow_forward
             </span>
@@ -154,13 +174,13 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Residential Verification Form
+              {t("residentialTitle")}
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
-              Verification of permanent resident address in this sub-district.
+              {t("residentialDescription")}
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
-              <span>Start Application</span>
+              <span>{t("startApplication")}</span>
               <span className="material-symbols-outlined text-sm">
                 arrow_forward
               </span>
@@ -178,14 +198,13 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Income Verification Form
+              {t("incomeTitle")}
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
-              Income verification certificate for various official and welfare
-              purposes.
+              {t("incomeDescription")}
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
-              <span>Start Application</span>
+              <span>{t("startApplication")}</span>
               <span className="material-symbols-outlined text-sm">
                 arrow_forward
               </span>
@@ -203,14 +222,13 @@ export default function DashboardPage() {
               </span>
             </div>
             <h3 className="text-base font-bold text-on-surface mb-1.5 leading-tight">
-              Identity Card Fine Appeal
+              {t("fineAppealTitle")}
             </h3>
             <p className="text-xs text-secondary mb-5 flex-grow">
-              Appeal for reduction of IC damage or loss fines with sub-district
-              verification.
+              {t("fineAppealDescription")}
             </p>
             <button className="bg-primary-container text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer">
-              <span>Start Application</span>
+              <span>{t("startApplication")}</span>
               <span className="material-symbols-outlined text-sm">
                 arrow_forward
               </span>
@@ -223,13 +241,13 @@ export default function DashboardPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-on-surface">
-            Application Status
+            {t("applicationStatus")}
           </h2>
           <Link
             className="text-primary text-sm font-semibold flex items-center hover:underline"
             href="/review-status"
           >
-            <span>View All</span>
+            <span>{navigation("viewAll")}</span>
             <span className="material-symbols-outlined text-sm ml-1">
               open_in_new
             </span>
@@ -239,7 +257,7 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {isLoading ? (
               <div className="text-center py-6 text-sm text-secondary font-medium">
-                Please wait, loading application status...
+                {t("loadingStatus")}
               </div>
             ) : applications.length > 0 ? (
               applications.map((app) => {
@@ -266,21 +284,21 @@ export default function DashboardPage() {
                   iconBg = "bg-yellow-50";
                 }
 
-                let statusText = "In Review";
+                let statusText = t("inReview");
                 let statusClass =
                   "bg-secondary-container text-on-secondary-container";
                 if (isApproved) {
-                  statusText = "Approved";
+                  statusText = t("approved");
                   statusClass = "bg-green-100 text-green-800";
                 } else if (isDraft) {
-                  statusText = "Draft";
+                  statusText = t("draft");
                   statusClass =
                     "bg-surface-container-highest text-on-surface-variant";
                 } else if (isActionRequired) {
-                  statusText = "Action Required";
+                  statusText = t("actionRequired");
                   statusClass = "bg-yellow-100 text-yellow-800";
                 } else if (isRejected) {
-                  statusText = "Rejected";
+                  statusText = t("rejected");
                   statusClass = "bg-red-100 text-red-800";
                 }
 
@@ -290,7 +308,11 @@ export default function DashboardPage() {
                   <div
                     key={app.id}
                     className="bg-white border border-outline-variant rounded-lg p-3.5 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer hover:border-primary"
-                    onClick={() => router.push(`/review-status?focus=${encodeURIComponent(app.id)}`)}
+                    onClick={() =>
+                      router.push(
+                        `/review-status?focus=${encodeURIComponent(app.id)}`,
+                      )
+                    }
                   >
                     <div className="flex items-center gap-3">
                       <div
@@ -307,7 +329,7 @@ export default function DashboardPage() {
                           {app.title}
                         </p>
                         <p className="text-[11px] text-on-surface-variant">
-                          Submitted on {formattedDate}
+                          {t("submittedOn", { date: formattedDate })}
                         </p>
                       </div>
                     </div>
@@ -326,8 +348,7 @@ export default function DashboardPage() {
               })
             ) : (
               <div className="bg-white border border-outline-variant border-dashed rounded-lg p-6 text-center text-xs text-on-surface-variant">
-                No active applications were found. Please click &quot;Apply for a
-                Certificate&quot; to create a new application.
+                {t("noApplications")}
               </div>
             )}
           </div>
@@ -340,7 +361,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <p className="text-xs text-on-surface-variant max-w-[200px]">
-              Your application history is displayed in real time, updated directly from the system.
+              {t("historyDescription")}
             </p>
           </div>
         </div>
@@ -349,12 +370,12 @@ export default function DashboardPage() {
   );
 }
 
-function formatFirestoreDate(value: unknown) {
+function formatFirestoreDate(value: unknown, locale = "en") {
   const date = toDate(value);
   if (!date) {
-    return "Pending";
+    return locale === "ms" ? "Menunggu" : "Pending";
   }
-  return new Intl.DateTimeFormat("ms-MY", {
+  return new Intl.DateTimeFormat(locale === "ms" ? "ms-MY" : "en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",

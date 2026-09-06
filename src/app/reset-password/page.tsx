@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   confirmPasswordReset,
   verifyPasswordResetCode,
@@ -10,6 +11,8 @@ import {
 import { auth } from "@/lib/firebase";
 
 function ResetPasswordContent() {
+  const t = useTranslations("Authentication");
+  const c = useTranslations("Common");
   const searchParams = useSearchParams();
   const actionCode = searchParams.get("oobCode") || "";
   const mode = searchParams.get("mode") || "";
@@ -51,12 +54,12 @@ function ResetPasswordContent() {
     setErrorMessage("");
 
     if (newPassword.length < 6) {
-      setErrorMessage("New password must be at least 6 characters.");
+      setErrorMessage(t("passwordMinLength"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setErrorMessage("New passwords do not match.");
+      setErrorMessage(t("passwordsDoNotMatch"));
       return;
     }
 
@@ -89,14 +92,13 @@ function ResetPasswordContent() {
         <div className="grid w-full grid-cols-1 items-center gap-10 lg:grid-cols-12">
           <section className="hidden lg:col-span-7 lg:block">
             <p className="mb-3 text-sm font-bold uppercase tracking-wide text-primary">
-              Account Recovery
+              {t("accountRecovery")}
             </p>
             <h1 className="max-w-xl text-4xl font-extrabold leading-tight text-primary">
-              Reset your portal password securely.
+              {t("resetPasswordHeading")}
             </h1>
             <p className="mt-4 max-w-lg text-sm leading-6 text-on-surface-variant">
-              Choose a new password for your account. After this is complete, you can
-              return to the login page and sign in with the updated password.
+              {t("resetPasswordDescription")}
             </p>
           </section>
 
@@ -107,27 +109,27 @@ function ResetPasswordContent() {
                   <span className="material-symbols-outlined">lock_reset</span>
                 </div>
                 <h2 className="text-2xl font-bold text-primary">
-                  Reset Password
+                  {t("resetPassword")}
                 </h2>
                 <p className="mt-1 text-sm text-on-surface-variant">
-                  {email || "Verifying your reset link..."}
+                  {email || t("verifyingResetLink")}
                 </p>
               </div>
 
               {isCheckingCode ? (
                 <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-4 text-sm font-medium text-on-surface-variant">
-                  Checking reset link...
+                  {t("checkingResetLink")}
                 </div>
               ) : isComplete ? (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-green-200 bg-green-100 p-4 text-sm font-semibold text-green-800">
-                    Password updated successfully.
+                    {t("passwordUpdatedSuccessfully")}
                   </div>
                   <Link
                     className="block rounded-lg bg-primary px-4 py-3 text-center text-sm font-bold text-white transition-colors hover:bg-primary/90"
                     href="/login"
                   >
-                    Back to Login
+                    {t("backToLogin")}
                   </Link>
                 </div>
               ) : errorMessage && !email ? (
@@ -139,7 +141,7 @@ function ResetPasswordContent() {
                     className="block rounded-lg border border-outline px-4 py-3 text-center text-sm font-bold text-primary transition-colors hover:bg-gray-50"
                     href="/login"
                   >
-                    Back to Login
+                    {t("backToLogin")}
                   </Link>
                 </div>
               ) : (
@@ -152,7 +154,7 @@ function ResetPasswordContent() {
 
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-on-surface">
-                      New Password
+                      {t("newPassword")}
                     </label>
                     <div className="relative">
                       <input
@@ -166,7 +168,7 @@ function ResetPasswordContent() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary"
                         type="button"
                         onClick={() => setShowPassword((value) => !value)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                       >
                         <span className="material-symbols-outlined text-xl">
                           {showPassword ? "visibility_off" : "visibility"}
@@ -177,7 +179,7 @@ function ResetPasswordContent() {
 
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-on-surface">
-                      Confirm New Password
+                      {t("confirmPassword")}
                     </label>
                     <input
                       type={showPassword ? "text" : "password"}
@@ -193,7 +195,7 @@ function ResetPasswordContent() {
                     disabled={isSubmitting}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-gray-400"
                   >
-                    <span>{isSubmitting ? "Updating..." : "Update Password"}</span>
+                    <span>{isSubmitting ? t("updatingPassword") : t("updatePassword")}</span>
                     {!isSubmitting && (
                       <span className="material-symbols-outlined text-lg">
                         arrow_forward
@@ -215,7 +217,7 @@ export default function ResetPasswordPage() {
     <Suspense
       fallback={
         <main className="min-h-screen bg-white p-6 text-sm font-medium text-on-surface-variant">
-          Loading reset form...
+          Loading...
         </main>
       }
     >

@@ -20,6 +20,8 @@ import { useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { districtOptions } from "@/lib/districts";
+import { useTranslations } from "next-intl";
+import { getApplicationCopyKeys } from "@/lib/applicationTitles";
 
 type FormValues = Record<string, string>;
 type FormErrors = Record<string, string>;
@@ -61,6 +63,65 @@ export default function ApplicationFormPage({
   const [currentUserId, setCurrentUserId] = useState("");
   const hasLoadedInitialData = useRef(false);
   const hasUserEdited = useRef(false);
+  const t = useTranslations("Applications");
+  const c = useTranslations("Common");
+  const copyKeys = getApplicationCopyKeys(config.slug);
+  const localizedTitle = copyKeys ? t(copyKeys.title) : config.title;
+  const localizedShortTitle = copyKeys
+    ? t(copyKeys.shortTitle)
+    : config.shortTitle;
+  const localizedDescription = copyKeys
+    ? t(copyKeys.description)
+    : config.description;
+
+  const fieldLabelMap: Record<string, string> = {
+    name: t("fullName"),
+    idNumber: t("identityCardPassport"),
+    citizenship: t("citizenshipStatus"),
+    icAddress: t("identityCardAddress"),
+    residentialAddress: t("residentialAddress"),
+    residentialStatus: t("residenceStatus"),
+    otherResidentialStatus: t("otherResidenceStatus"),
+    durationYears: t("residenceYears"),
+    durationMonths: t("residenceMonths"),
+    durationDays: t("residenceDays"),
+    maritalStatus: t("maritalStatus"),
+    referenceNumber: t("referenceNumber"),
+    occupation: t("occupation"),
+    purpose: t("purpose"),
+    income: t("monthlyIncome"),
+    phoneNumber: t("phoneNumber"),
+    caseType: t("caseType"),
+    incidentDate: t("incidentDate"),
+    fineAmount: t("fineAmount"),
+    incidentDetails: t("caseDetails"),
+    appealReason: t("fineAppealReason"),
+  };
+
+  const fieldPlaceholderMap: Record<string, string> = {
+    name: t("nameAsIdentityCard"),
+    otherResidentialStatus: t("fillIfOther"),
+    referenceNumber: t("ifAny"),
+    occupation: t("unemployedIfApplicable"),
+    purpose: t("statePurpose"),
+    incidentDetails: t("describeIncident"),
+    appealReason: t("explainFineReduction"),
+  };
+
+  const optionLabelMap: Record<string, string> = {
+    warganegara: t("citizen"),
+    "bukan-warganegara": t("nonCitizen"),
+    sendiri: t("ownHome"),
+    sewa: t("rental"),
+    majikan: t("employerProvided"),
+    "lain-lain": t("others"),
+    bujang: t("single"),
+    berkahwin: t("married"),
+    cerai: t("divorced"),
+    kematian: t("widowed"),
+    kehilangan: t("lostIdentityCard"),
+    kerosakan: t("damagedIdentityCard"),
+  };
 
   useEffect(() => {
     hasLoadedInitialData.current = false;
@@ -377,7 +438,7 @@ export default function ApplicationFormPage({
       const notificationId = await createInAppNotification({
         uid: currentUser.uid,
         title: "Application Submitted",
-        message: `We have received your ${config.title} application (${submittedApplication.referenceNumber}) and it is now in review.`,
+        message: `We have received your ${localizedTitle} application (${submittedApplication.referenceNumber}) and it is now in review.`,
         applicationId: submittedApplication.applicationId,
         referenceNumber: submittedApplication.referenceNumber,
         applicationTitle: config.title,
@@ -392,7 +453,7 @@ export default function ApplicationFormPage({
           notificationId,
           applicationId: submittedApplication.applicationId,
           referenceNumber: submittedApplication.referenceNumber,
-          applicationTitle: config.title,
+          applicationTitle: localizedTitle,
           eventType: "application_submitted",
           status: "In Review",
           actionUrl: `/review-status?focus=${encodeURIComponent(
@@ -470,35 +531,35 @@ export default function ApplicationFormPage({
       <section className="border-b border-outline-variant pb-5">
         <nav className="mb-3 flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
           <Link href="/new-application" className="hover:text-primary">
-            Applications
+            {t("newApplication")}
           </Link>
           <span className="material-symbols-outlined text-sm">
             chevron_right
           </span>
-          <span className="text-primary">{config.shortTitle}</span>
+          <span className="text-primary">{localizedShortTitle}</span>
         </nav>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-secondary">
-              Online Application
+              {t("onlineApplication")}
             </p>
             <h1 className="text-2xl font-bold tracking-tight text-primary md:text-3xl">
-              {config.title}
+              {localizedTitle}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
-              {config.description}
+              {localizedDescription}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-80">
             <div className="rounded-xl border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
-                Initial Status
+                {t("initialStatus")}
               </p>
-              <p className="mt-1 font-bold text-primary">Draft</p>
+              <p className="mt-1 font-bold text-primary">{c("draft")}</p>
             </div>
             <div className="rounded-xl border border-outline-variant bg-white p-3">
               <p className="text-[11px] font-bold uppercase text-on-surface-variant">
-                Estimated Time
+                {t("estimatedTime")}
               </p>
               <p className="mt-1 font-bold text-primary">
                 {config.estimatedTime}
@@ -509,18 +570,9 @@ export default function ApplicationFormPage({
       </section>
 
       <section className="grid grid-cols-1 overflow-hidden rounded-xl border border-outline-variant bg-white md:grid-cols-3">
-        <ProcessStep
-          title="Step 1"
-          description="Complete the application details."
-        />
-        <ProcessStep
-          title="Step 2"
-          description="The office reviews your application."
-        />
-        <ProcessStep
-          title="Step 3"
-          description="You receive the next instructions."
-        />
+        <ProcessStep title={t("stepOne")} description={t("stepOneDesc")} />
+        <ProcessStep title={t("stepTwo")} description={t("stepTwoDesc")} />
+        <ProcessStep title={t("stepThree")} description={t("stepThreeDesc")} />
       </section>
 
       {Object.keys(errors).length > 0 && (
@@ -529,12 +581,9 @@ export default function ApplicationFormPage({
           data-error-key="form"
           tabIndex={-1}
         >
-          <p className="text-sm font-bold">
-            Please review your application details.
-          </p>
+          <p className="text-sm font-bold">{t("reviewAppDetails")}</p>
           <p className="mt-1 text-xs">
-            {errors.form ||
-              "Complete all marked fields before submitting your application."}
+            {errors.form || t("completeAllMarkedFields")}
           </p>
         </div>
       )}
@@ -545,14 +594,15 @@ export default function ApplicationFormPage({
           className="overflow-hidden rounded-xl border border-outline-variant bg-white"
         >
           <section className="border-b border-outline-variant p-5 md:p-6">
-            <SectionTitle icon="person" title="Applicant Details" />
+            <SectionTitle icon="person" title={t("applicantDetails")} />
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label
                   className="mb-1.5 block text-sm font-bold text-on-surface"
                   htmlFor="district"
                 >
-                  District / Office Area <span className="text-error">*</span>
+                  {t("districtOfficeArea")}{" "}
+                  <span className="text-error">*</span>
                 </label>
                 <select
                   id="district"
@@ -563,7 +613,7 @@ export default function ApplicationFormPage({
                   }
                   className={fieldClassName(errors.district)}
                 >
-                  <option value="">Select application district</option>
+                  <option value="">{t("selectDistrict")}</option>
                   {districtOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -571,8 +621,7 @@ export default function ApplicationFormPage({
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Your application will be routed to the staff assigned to this
-                  area.
+                  {t("districtRoutingHelp")}
                 </p>
                 {errors.district && (
                   <p className="mt-1 text-xs font-semibold text-error">
@@ -588,6 +637,11 @@ export default function ApplicationFormPage({
                   isOtherResidentialStatusField &&
                   values.residentialStatus !== "lain-lain";
 
+                const translatedLabel =
+                  fieldLabelMap[field.name] || field.label;
+                const translatedPlaceholder =
+                  fieldPlaceholderMap[field.name] || field.placeholder;
+
                 return (
                   <div
                     className={field.fullWidth ? "md:col-span-2" : ""}
@@ -597,7 +651,7 @@ export default function ApplicationFormPage({
                       className="mb-1.5 block text-sm font-bold text-on-surface"
                       htmlFor={field.name}
                     >
-                      {field.label}
+                      {translatedLabel}
                       {field.required && <span className="text-error"> *</span>}
                     </label>
                     {field.type === "select" ? (
@@ -614,10 +668,10 @@ export default function ApplicationFormPage({
                           isFieldDisabled,
                         )}
                       >
-                        <option value="">Select one</option>
+                        <option value="">{c("selectOne")}</option>
                         {field.options?.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {optionLabelMap[option.value] || option.label}
                           </option>
                         ))}
                       </select>
@@ -627,7 +681,7 @@ export default function ApplicationFormPage({
                         name={field.name}
                         rows={4}
                         value={values[field.name]}
-                        placeholder={field.placeholder}
+                        placeholder={translatedPlaceholder}
                         disabled={isFieldDisabled}
                         onChange={(event) =>
                           updateValue(field.name, event.target.value)
@@ -648,7 +702,7 @@ export default function ApplicationFormPage({
                             : undefined
                         }
                         value={values[field.name]}
-                        placeholder={field.placeholder}
+                        placeholder={translatedPlaceholder}
                         onChange={(event) =>
                           updateValue(field.name, event.target.value)
                         }
@@ -675,7 +729,7 @@ export default function ApplicationFormPage({
           </section>
 
           <section className="p-5 md:p-6">
-            <SectionTitle icon="gavel" title="Applicant Declaration" />
+            <SectionTitle icon="gavel" title={t("applicantDeclaration")} />
             <label className="mt-4 flex gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface">
               <input
                 id="declaration"
@@ -692,10 +746,7 @@ export default function ApplicationFormPage({
                 }}
                 className="mt-1 h-4 w-4 accent-primary"
               />
-              <span>
-                I declare that the information provided is true and that I am
-                fully responsible for the details in this application.
-              </span>
+              <span>{t("declarationText")}</span>
             </label>
             {errors.declaration && (
               <p className="mt-2 text-xs font-semibold text-error">
@@ -714,7 +765,7 @@ export default function ApplicationFormPage({
                         ? "cloud_done"
                         : "cloud_queue"}
                 </span>
-                <span>{getDraftStatusText(draftSaveStatus)}</span>
+                <span>{getDraftStatusText(draftSaveStatus, t)}</span>
               </div>
               <button
                 type="button"
@@ -724,34 +775,34 @@ export default function ApplicationFormPage({
                   setDeclarationAccepted(false);
                   setErrors({});
                 }}
-                className="flex-1 rounded-lg border border-outline px-5 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container-low"
+                className="flex-1 whitespace-nowrap rounded-lg border border-outline px-3 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container-low"
               >
-                Clear Form
+                {t("clearForm")}
               </button>
               <button
                 type="button"
                 disabled={isManualSaving || isSubmitting || isDeletingDraft}
                 onClick={() => saveDraft({ manual: true })}
-                className="flex-1 rounded-lg border border-primary px-5 py-2.5 text-sm font-bold text-primary hover:bg-primary-container hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 whitespace-nowrap rounded-lg border border-primary px-3 py-2.5 text-sm font-bold text-primary hover:bg-primary-container hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isManualSaving ? "Saving..." : "Save Draft"}
+                {isManualSaving ? t("savingDraft") : t("saveDraft")}
               </button>
               {draftApplicationId && (
                 <button
                   type="button"
                   disabled={isManualSaving || isSubmitting || isDeletingDraft}
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex-1 rounded-lg border border-error px-5 py-2.5 text-sm font-bold text-error hover:bg-error-container disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 whitespace-nowrap rounded-lg border border-error px-3 py-2.5 text-sm font-bold text-error hover:bg-error-container disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isDeletingDraft ? "Deleting..." : "Delete Draft"}
+                  {isDeletingDraft ? c("deleting") : t("deleteDraft")}
                 </button>
               )}
               <button
                 type="submit"
                 disabled={isSubmitting || isManualSaving || isDeletingDraft}
-                className="flex-1 min-w-[11rem] whitespace-nowrap rounded-lg border border-outline bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-container"
+                className="flex-1 whitespace-nowrap rounded-lg border border-outline bg-primary px-2 py-2.5 text-sm font-bold text-white hover:bg-primary-container"
               >
-                {isSubmitting ? "Submitting..." : "Submit Application"}
+                {isSubmitting ? c("submitting") : t("submitApplication")}
               </button>
             </div>
           </section>
@@ -760,28 +811,24 @@ export default function ApplicationFormPage({
         <aside className="space-y-4">
           <div className="rounded-xl border-t-4 border-primary bg-white p-5 shadow-sm">
             <h2 className="text-base font-bold text-primary">
-              Process Information
+              {t("processInformation")}
             </h2>
             <ul className="mt-4 space-y-4 text-sm leading-6 text-on-surface-variant">
               <li>
                 <strong className="block text-on-surface">
-                  Supporting documents
+                  {t("supportingDocuments")}
                 </strong>
-                Supporting documents may be requested after office review,
-                together with appointment details or next instructions.
+                {t("supportingDocumentsDesc")}
               </li>
               <li>
                 <strong className="block text-on-surface">
-                  Office section
+                  {t("officeSection")}
                 </strong>
-                Comments, signature, date, name, and official stamp are
-                completed by the office, not by the applicant.
+                {t("officeSectionDesc")}
               </li>
               <li>
-                <strong className="block text-on-surface">
-                  Application status
-                </strong>
-                Submitted applications are recorded for initial review.
+                <strong className="block text-on-surface">{c("status")}</strong>
+                {t("applicationStatusDesc")}
               </li>
             </ul>
           </div>
@@ -790,10 +837,7 @@ export default function ApplicationFormPage({
               <span className="material-symbols-outlined text-primary">
                 info
               </span>
-              <p>
-                Make sure your information is accurate. Incomplete details may
-                delay the office review.
-              </p>
+              <p>{t("accurateNotice")}</p>
             </div>
           </div>
         </aside>
@@ -806,15 +850,14 @@ export default function ApplicationFormPage({
               <span className="material-symbols-outlined">check</span>
             </div>
             <h2 className="mt-4 text-xl font-bold text-primary">
-              Application Submitted Successfully
+              {t("submittedSuccessfully")}
             </h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Your application details have been recorded. Please check your
-              application status for further updates.
+              {t("submittedDesc")}
             </p>
             {submittedReferenceNumber && (
               <p className="mt-3 text-xs font-bold text-primary">
-                Reference No.: {submittedReferenceNumber}
+                {t("referenceNoLabel")} {submittedReferenceNumber}
               </p>
             )}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
@@ -823,14 +866,14 @@ export default function ApplicationFormPage({
                 onClick={() => setShowSuccess(false)}
                 className="flex-1 border border-outline px-4 py-2.5 text-sm font-bold text-secondary"
               >
-                Close
+                {c("close")}
               </button>
               <button
                 type="button"
                 onClick={() => router.push("/review-status")}
                 className="flex-1 bg-primary px-4 py-2.5 text-sm font-bold text-white"
               >
-                Check Status
+                {t("checkStatus")}
               </button>
             </div>
           </div>
@@ -847,11 +890,10 @@ export default function ApplicationFormPage({
             <div className="flex items-start gap-3">
               <div className="space-y-1">
                 <h2 className="text-base font-bold text-on-surface">
-                  Delete draft application?
+                  {t("deleteDraftTitle")}
                 </h2>
                 <p className="text-sm leading-6 text-on-surface-variant">
-                  This will permanently remove your saved draft and all of its
-                  current values. This action cannot be undone.
+                  {t("deleteDraftConfirm")}
                 </p>
               </div>
             </div>
@@ -862,7 +904,7 @@ export default function ApplicationFormPage({
                 onClick={() => setShowDeleteConfirm(false)}
                 className="flex-1 rounded-lg border border-outline px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container"
               >
-                Cancel
+                {c("cancel")}
               </button>
               <button
                 type="button"
@@ -873,7 +915,7 @@ export default function ApplicationFormPage({
                 }}
                 className="flex-1 rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isDeletingDraft ? "Deleting..." : "Delete"}
+                {isDeletingDraft ? c("deleting") : c("delete")}
               </button>
             </div>
           </div>
@@ -921,20 +963,23 @@ function fieldClassName(error?: string, disabled = false) {
   }`;
 }
 
-function getDraftStatusText(status: DraftSaveStatus) {
+function getDraftStatusText(
+  status: DraftSaveStatus,
+  t: (key: string) => string,
+) {
   if (status === "saving") {
-    return "Saving draft...";
+    return t("savingDraft");
   }
 
   if (status === "saved") {
-    return "Draft saved automatically.";
+    return t("draftSavedAuto");
   }
 
   if (status === "error") {
-    return "Autosave failed. Try saving the draft manually.";
+    return t("autosaveFailed");
   }
 
-  return "Autosave starts when you begin filling the form.";
+  return t("autosaveStarts");
 }
 
 function isValidIdNumber(value: string) {

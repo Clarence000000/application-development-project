@@ -3,9 +3,10 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AiHelpChat from "@/components/AiHelpChat";
+import { useTranslations } from "next-intl";
 import {
   formatNotificationDate,
   subscribeNotificationHistory,
@@ -19,6 +20,8 @@ export default function PortalLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("Navigation");
+  const notificationT = useTranslations("Notifications");
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -26,8 +29,10 @@ export default function PortalLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [notifications, setNotifications] = useState<NotificationHistoryItem[]>([]);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // ➕ Create Refs to track the dropdown containers
+  // Create Refs to track the dropdown containers
   const notifRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -83,14 +88,32 @@ export default function PortalLayout({
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(Boolean(user));
+      setAuthChecked(true);
+
+      if (!user) {
+        router.replace("/login");
+      }
+    });
+
+    return unsubscribe;
+  }, [router]);
+
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications],
   );
 
-  const handleLogout = (e: React.MouseEvent) => {
+  if (!authChecked || !isAuthenticated) {
+    return null;
+  }
+
+  const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
-    router.push("/login");
+    await signOut(auth);
+    router.replace("/login");
   };
 
   const handleSettings = () => {
@@ -107,10 +130,10 @@ export default function PortalLayout({
   };
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: "dashboard" },
-    { name: "New Application", href: "/new-application", icon: "description" },
-    { name: "Review Status", href: "/review-status", icon: "fact_check" },
-    { name: "Notifications", href: "/notifications", icon: "notifications" },
+    { name: t("dashboard"), href: "/dashboard", icon: "dashboard" },
+    { name: t("newApplication"), href: "/new-application", icon: "description" },
+    { name: t("reviewStatus"), href: "/review-status", icon: "fact_check" },
+    { name: t("notifications"), href: "/notifications", icon: "notifications" },
   ];
 
   return (
@@ -153,13 +176,13 @@ export default function PortalLayout({
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white border border-outline-variant rounded-xl shadow-lg z-50 py-2">
                 <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-                  <p className="text-xs font-bold text-gray-500">Notifications</p>
+                  <p className="text-xs font-bold text-gray-500">{t("notifications")}</p>
                   <Link
                     className="text-[10px] font-bold text-primary hover:underline"
                     href="/notifications"
                     onClick={() => setNotifOpen(false)}
                   >
-                    View all
+                    {t("viewAll")}
                   </Link>
                 </div>
                 {notifications.length > 0 ? (
@@ -183,10 +206,10 @@ export default function PortalLayout({
                           />
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-on-surface">
-                              {notification.title}
+                              {getNotificationTitle(notification, notificationT)}
                             </p>
                             <p className="mt-0.5 line-clamp-2 text-[10px] text-on-surface-variant">
-                              {notification.message}
+                              {getNotificationMessage(notification, notificationT)}
                             </p>
                             <p className="mt-1 text-[9px] font-semibold text-outline">
                               {formatNotificationDate(notification.createdAt)}
@@ -202,7 +225,7 @@ export default function PortalLayout({
                       notifications_off
                     </span>
                     <p className="mt-1 text-xs font-semibold text-on-surface">
-                      No notifications yet
+                      {t("noNotifications")}
                     </p>
                   </div>
                 )}
@@ -235,13 +258,13 @@ export default function PortalLayout({
                   onClick={() => setProfileOpen(false)} 
                   className="flex items-center gap-3 px-3 py-2 text-sm text-on-surface hover:bg-gray-50 rounded-lg"
                 >
-                  <span className="material-symbols-outlined text-sm">person</span> View Profile
+                  <span className="material-symbols-outlined text-sm">person</span> {t("viewProfile")}
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-3 py-2 text-sm text-error hover:bg-error-container/20 rounded-lg border-t border-gray-100 mt-1 cursor-pointer text-left"
                 >
-                  <span className="material-symbols-outlined text-sm">logout</span> Log Out
+                  <span className="material-symbols-outlined text-sm">logout</span> {t("logOut")}
                 </button>
               </div>
             )}
@@ -271,9 +294,9 @@ export default function PortalLayout({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-[#002D62] dark:text-white leading-tight">
-                  Citizen Portal
+                  {t("citizenPortal")}
                 </h2>
-                <p className="text-[10px] text-gray-500 font-medium">Official Government Service</p>
+                <p className="text-[10px] text-gray-500 font-medium">{t("officialService")}</p>
               </div>
             </div>
           </div>
@@ -301,32 +324,24 @@ export default function PortalLayout({
               );
             })}
           </nav>
-          <div className="px-5 mb-4">
-            <button
-              onClick={() => router.push("/new-application")}
-              className="w-full bg-primary-container text-white py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">add</span> New Form
-            </button>
-          </div>
           <div className="px-2 border-t border-gray-100 dark:border-gray-800 pt-3">
             <button
               onClick={handleSettings}
               className="w-full flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] transition-all text-sm font-semibold cursor-pointer text-left"
             >
               <span className="material-symbols-outlined text-xl">settings</span>
-              <span>Settings</span>
+              <span>{t("settings")}</span>
             </button>
             <a className="flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#FFFFFF] transition-all text-sm font-semibold" href="#">
               <span className="material-symbols-outlined text-xl">help</span>
-              <span>Help</span>
+              <span>{t("help")}</span>
             </a>
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-error transition-all text-sm font-semibold cursor-pointer text-left"
             >
               <span className="material-symbols-outlined text-xl">logout</span>
-              <span>Logout</span>
+              <span>{t("logOut")}</span>
             </button>
           </div>
         </aside>
@@ -351,9 +366,9 @@ export default function PortalLayout({
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-[#002D62] dark:text-white leading-tight">
-                      Citizen Portal
+                      {t("citizenPortal")}
                     </h2>
-                    <p className="text-[10px] text-gray-500 font-medium">Official Government</p>
+                    <p className="text-[10px] text-gray-500 font-medium">{t("officialService")}</p>
                   </div>
                 </div>
                 <button
@@ -396,20 +411,20 @@ export default function PortalLayout({
                   }}
                   className="w-full bg-primary-container text-white py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-base">add</span> New Form
+                  <span className="material-symbols-outlined text-base">add</span> {t("newForm")}
                 </button>
               </div>
               <div className="px-2 border-t border-gray-100 dark:border-gray-800 pt-3">
                 <a className="flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-[#002D62] transition-all text-sm font-semibold" href="#">
                   <span className="material-symbols-outlined text-xl">help</span>
-                  <span>Help</span>
+                  <span>{t("help")}</span>
                 </a>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-error transition-all text-sm font-semibold cursor-pointer text-left"
                 >
                   <span className="material-symbols-outlined text-xl">logout</span>
-                  <span>Logout</span>
+                  <span>{t("logOut")}</span>
                 </button>
               </div>
             </aside>
@@ -429,20 +444,20 @@ export default function PortalLayout({
         }`}
       >
         <div className="flex flex-col">
-          <span className="text-xs font-bold text-gray-900 dark:text-white">Citizen Portal</span>
+          <span className="text-xs font-bold text-gray-900 dark:text-white">{t("citizenPortal")}</span>
           <p className="text-[10px] text-gray-500 dark:text-gray-400">
-            © 2024 Government of Malaysia. All Rights Reserved.
+            {t("copyright")}
           </p>
         </div>
         <div className="flex gap-5 mt-2 md:mt-0">
           <a className="text-[11px] text-gray-500 hover:text-[#002D62] dark:hover:text-blue-400 transition-colors font-medium" href="#">
-            Privacy Policy
+            {t("privacyPolicy")}
           </a>
           <a className="text-[11px] text-gray-500 hover:text-[#002D62] dark:hover:text-blue-400 transition-colors font-medium" href="#">
-            Terms & Conditions
+            {t("termsConditions")}
           </a>
           <a className="text-[11px] text-gray-500 hover:text-[#002D62] dark:hover:text-blue-400 transition-colors font-medium" href="#">
-            Contact Us
+            {t("contactUs")}
           </a>
         </div>
       </footer>
@@ -481,6 +496,72 @@ export default function PortalLayout({
       />
     </div>
   );
+}
+
+// For notifications dropdown translation (layout.tsx uses dropdown, page.tsx uses container)
+function getNotificationMessage(
+  notification: NotificationHistoryItem,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
+  if (notification.eventType === "application_submitted") {
+    return t("applicationSubmittedMessage", {
+      application: notification.applicationTitle || "",
+      reference: notification.referenceNumber || "",
+    });
+  }
+
+  if (notification.eventType === "status_updated") {
+    if (notification.message.toLowerCase().includes("approved")) {
+      return t("approvedMessage", {
+        application: notification.applicationTitle || "",
+        reference: notification.referenceNumber || "",
+      });
+    }
+
+    if (notification.message.toLowerCase().includes("rejected")) {
+      return t("rejectedMessage", {
+        application: notification.applicationTitle || "",
+        reference: notification.referenceNumber || "",
+      });
+    }
+
+    return t("statusUpdatedMessage", {
+      application: notification.applicationTitle || "",
+      reference: notification.referenceNumber || "",
+    });
+  }
+
+  return notification.message;
+}
+
+// Same translation function but for title dropdown
+function getNotificationTitle(
+  notification: NotificationHistoryItem,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
+  if (notification.eventType === "application_submitted") {
+    return t("applicationSubmittedTitle");
+  }
+
+  if (notification.eventType === "status_updated") {
+    const message = notification.message.toLowerCase();
+
+    if (message.includes("approved")) {
+      return t("applicationStatusTitle", { status: t("approved") });
+    }
+
+    if (message.includes("rejected")) {
+      return t("applicationStatusTitle", { status: t("rejected") });
+    }
+
+    return t("applicationStatusTitle", { status: t("updated") });
+  }
+
+  if (notification.eventType === "document_requested") {
+    return t("actionRequiredTitle");
+  }
+
+  return notification.title;
 }
 
 function getApplicantAiPageContext(pathname: string) {

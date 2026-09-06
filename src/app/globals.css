@@ -33,6 +33,12 @@
   --font-public-sans: 'Public Sans', sans-serif;
 }
 
+*{
+  -webkit-tap-highlight-color: transparent;
+  ::-moz-selection { background: #bad7ff; color: #000000; } /* Firefox */
+  ::selection { background: #00193c; color: #ffffff; }
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-on-background);
