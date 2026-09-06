@@ -1,5 +1,3 @@
-import { getTranslations } from 'next-intl/server';
-
 export type ApplicationSlug = "residential" | "income" | "ic-appeal";
 
 export type FieldOption = {
@@ -48,8 +46,6 @@ const maritalStatusOptions: FieldOption[] = [
   { label: "Divorced", value: "cerai" },
   { label: "Widowed", value: "kematian" },
 ];
-
-const t = await getTranslations("Applications");
 
 export const applicationForms: ApplicationFormConfig[] = [
   {
